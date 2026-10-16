@@ -23,7 +23,7 @@ export default function Home() {
   }, []);
   const api = useMemo(() => session ? new ApiClient(session.token, () => expire(session.token)) : null, [session, expire]);
   if (!session || !api) return <Login message={sessionMessage} onLogin={(value) => { setSessionMessage(""); setSession(value); }} />;
-  return <Workspace key={session.token} api={api} me={session.profile} onLogout={() => { setSession(null); setSessionMessage(""); }} />;
+  return <Workspace key={session.token} api={api} me={session.profile} onLogout={() => { window.history.replaceState(null, "", window.location.pathname + window.location.search); setSession(null); setSessionMessage(""); }} />;
 }
 
 function Login({ onLogin, message }: { onLogin: (session: Session) => void; message: string }) {

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.config import get_settings
-from app.models import Employee, ZupDelivery
+from app.models import Employee, LeaveCancellation, ZupDelivery
 from app.modules import integrations
 from app.security import require_hr
 
@@ -16,7 +16,9 @@ def status(db: Session = Depends(get_db)):
     integrations.zup_adapter().employees()
     settings = get_settings()
     counts = dict(db.execute(select(ZupDelivery.status, func.count()).group_by(ZupDelivery.status)).all())
+    cancellations = dict(db.execute(select(LeaveCancellation.status, func.count()).group_by(LeaveCancellation.status)).all())
     return {"connected": True, "mode": f"{settings.zup_mode}_http", "contract": "jana-zup-v1",
             "auth_type": settings.zup_auth_type, "tls_verified": settings.zup_tls_verified,
             "mapped_employees": db.scalar(select(func.count()).select_from(Employee).where(Employee.zup_id.is_not(None))),
-            "pending": counts.get("pending", 0), "error": counts.get("error", 0), "synced": counts.get("synced", 0)}
+            "pending": counts.get("pending", 0), "error": counts.get("error", 0), "synced": counts.get("synced", 0),
+            "cancellations": {"pending": cancellations.get("pending", 0), "error": cancellations.get("error", 0), "synced": cancellations.get("synced", 0)}}

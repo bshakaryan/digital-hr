@@ -57,7 +57,7 @@ call("GET", "/audit", token=tokens["employee"], expected=403)
 
 initial_balance = call("GET", "/me", token=tokens["employee"])["leave_balance"]
 existing = call("GET", "/requests", token=tokens["employee"])
-occupied = [item for item in existing if item["status"] != "rejected"]
+occupied = [item for item in existing if item["status"] in ("submitted", "manager_approved", "approved", "cancellation_requested")]
 day = next((date(2027, 1, 11) + timedelta(days=offset)).isoformat() for offset in range(700)
     if calculate_days(date(2027, 1, 11) + timedelta(days=offset), date(2027, 1, 11) + timedelta(days=offset))["days_count"] == 1
     and not any(item["start_date"] <= (date(2027, 1, 11) + timedelta(days=offset)).isoformat() <= item["end_date"] for item in occupied))

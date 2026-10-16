@@ -469,6 +469,53 @@ dd { margin: 7px 0 0; font-size: 13px; overflow-wrap: anywhere; }
 .knowledge-content > div { font-size: 14px; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; color: #718566; margin: 24px 0; }
 
 /* Responsive */
+.filter-grid { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; align-items: end; }
+.filter-grid > label { display: flex; flex-direction: column; gap: 7px; flex: 1 1 160px; min-width: 0; font-size: 11px; color: #62715b; }
+.filter-grid input, .filter-grid select { width: 100%; min-width: 0; font-size: 12px; background: white; }
+.filter-grid .checkbox-label { flex-direction: row; align-items: center; min-height: 42px; }
+.checkbox-label input { width: 16px; height: 16px; }
+.segmented { flex-wrap: wrap; }
+.queue-hint { font-size: 12px; color: #708267; margin: -2px 0 18px; }
+.queue-preview { margin-bottom: 24px; }
+.queue-preview > .request-preview { padding: 17px 22px; }
+.lifecycle-section { margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--line); }
+.lifecycle-section:empty { display: none; }
+.lifecycle-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.danger-text { color: #a24e3e; }
+.status-withdrawn, .status-cancelled { color: #64716b; background: #eef0ed; }
+.status-cancellation_requested { color: #a56b31; background: #fff1dd; }
+.history-dot.withdrawn, .history-dot.cancelled { background: #9ca99c; }
+.history-dot.cancellation_requested { background: #d6a564; }
+.notification-link { display: flex; margin-top: 13px; }
+.pagination { margin-top: 20px; }
+.org-tree { padding: 22px; }
+.org-tree ul { list-style: none; padding: 0; margin: 15px 0; }
+.org-tree ul ul { margin-left: 20px; border-left: 2px solid #dbe5d3; padding-left: 15px; }
+.org-person { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 15px; margin-bottom: 10px; width: 100%; border: 1px solid var(--line); border-radius: 10px; background: #fbfcf8; text-align: left; }
+.org-person > span:nth-child(2) { flex: 1; min-width: 120px; }
+.org-person strong { font-size: 13px; }
+.org-person small { display: block; color: #738168; margin-top: 5px; font-size: 11px; }
+.related-people { margin-top: 22px; }
+.related-people p { font-size: 13px; margin: 15px 0; }
+.related-people > button { margin: 0 8px 8px 0; }
+.team-calendar { min-width: 1250px; table-layout: fixed; }
+.team-calendar th, .team-calendar td { padding: 7px 2px; text-align: center; height: 44px; border-right: 1px solid #eef1e8; }
+.team-calendar th:first-child { position: sticky; left: 0; width: 190px; text-align: left; padding: 12px; background: #fff; z-index: 1; box-shadow: 2px 0 2px #19392308; white-space: normal; }
+.team-calendar th small { display: block; font-weight: 400; color: #7f8e75; margin-top: 5px; }
+.team-calendar .weekend { background: #f4f6f0; }
+.absence { width: 100%; min-height: 29px; border-radius: 4px; background: #dcebd2; color: #416132; font-size: 10px; }
+.absence-submitted { background: #f9e7c9; color: #916629; }
+.absence-manager_approved { background: #e6dff4; color: #70528d; }
+.absence-cancellation_requested { background: repeating-linear-gradient(135deg, #dcebd2, #dcebd2 4px, #fff1dd 4px, #fff1dd 8px); }
+.calendar-legend { display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 16px; }
+.calendar-note { margin-top: 18px; font-size: 13px; }
+.overlap-list { padding: 22px; margin-top: 22px; }
+.overlap-list h2 { font-size: 17px; margin-bottom: 10px; }
+.overlap-list > div { border-top: 1px solid var(--line); margin-top: 15px; padding-top: 15px; }
+.overlap-list small { display: block; color: #7b8d70; margin-top: 8px; }
+.integration-queue { margin-top: 22px; }
+.main-content > .panel + .panel { margin-top: 20px; }
+@media (max-width: 640px) { .filter-grid > label { flex-basis: calc(50% - 12px); } .filter-grid > label:first-child { flex-basis: 100%; } .queue-preview .request-preview { flex-wrap: wrap; } .org-tree { padding: 15px; } .org-tree ul ul { margin-left: 8px; padding-left: 8px; } .org-person { padding: 10px; } .team-calendar th:first-child { width: 145px; } .pagination { align-items: flex-start; } .lifecycle-actions .button { min-height: 42px; } .page-heading { flex-wrap: wrap; } }
 @media (min-width: 1550px) { .main-content { padding-top: 40px; } .welcome-banner { min-height: 280px; } .welcome-banner h2 { font-size: 36px; } .dashboard-columns { grid-template-columns: minmax(0,1fr) 315px; } .metric-card { padding: 24px; } }
 @media (max-width: 1200px) { .sidebar { width: 215px; padding-inline: 12px; } .main-shell { margin-left: 215px; } .main-content { padding-inline: 25px; } .topbar { padding-inline: 25px; } .dashboard-columns { grid-template-columns: minmax(0, 1fr) 255px; gap: 18px; } .metric-card { padding: 17px; } .metric-icon { width: 32px; height: 32px; } .metric-label { font-size: 10px; } .featured-course { grid-template-columns: 113px minmax(0,1fr); gap: 14px; padding-inline: 18px; } .request-preview-list { padding-inline: 16px; } .request-preview { gap: 8px; } .request-preview .status { font-size: 7px; } .request-preview > svg { display: none; } .request-preview-main strong small { display: none; } .panel-heading { padding-inline: 18px; } .request-preview-main strong { font-size: 10px; } .assistant-teaser { padding: 22px; } .courses-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (max-width: 1020px) { .dashboard-columns { grid-template-columns: minmax(0,1fr); } .dashboard-secondary { display: grid; grid-template-columns: 1fr 1fr; align-items: start; } .featured-course { grid-template-columns: 145px minmax(0,1fr); gap: 22px; } .request-preview-main strong { font-size: 12px; } .request-preview-main > span { font-size: 10px; } .request-preview .status { font-size: 10px; } .request-preview > svg { display: block; } .welcome-art { right: -20px; width: 48%; } .floating-card { width: 220px; padding: 15px 12px; gap: 9px; } .floating-card > span:nth-child(2) { font-size: 10px; } .floating-card strong { font-size: 7px; } .floating-icon { height: 35px; width: 35px; border-radius: 8px; } .floating-check { width: 19px; height: 19px; } .welcome-pill { font-size: 7px; left: 40%; } .welcome-star { right: 30px; } .today { display: none; } .metrics-grid { gap: 11px; } .metric-card { padding: 15px; } .metric-card > .metric-icon { display: none; } .team-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .login-story { padding-inline: 10%; } .login-story h1 { font-size: 40px; } .login-story-main > p { font-size: 12px; } .login-art { transform: scale(.9); } }

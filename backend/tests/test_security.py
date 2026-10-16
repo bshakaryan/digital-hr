@@ -180,7 +180,7 @@ def test_audit_is_hr_only_and_omits_credentials_and_question_text(api):
     assert response.status_code == 200
     assert any(event["action"] == "auth.login" for event in response.json())
     for event in response.json():
-        assert set(event) == {"id", "actor_id", "action", "entity_type", "entity_id", "created_at"}
+        assert set(event) == {"id", "actor_id", "action", "entity_type", "entity_id", "created_at", "actor_name", "action_label", "employee_id", "employee_name"}
     assert question not in response.text
     assert api.db.password not in response.text
     assert headers["Authorization"].split()[1] not in response.text

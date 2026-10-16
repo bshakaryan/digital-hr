@@ -1,13 +1,14 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ApiClient, errorMessage, type Course } from "@/lib/api";
 import { Empty, ErrorBox, Icon, Loading, Modal } from "./ui";
 import { useResource, type Resource } from "./use-resource";
 import { PageHeading } from "./workspace";
 
-export function Academy({ api, courses, onChanged, notify }: { api: ApiClient; courses: Resource<Course[]>; onChanged: () => void; notify: (message: string) => void }) {
-  const [selected, setSelected] = useState<number | null>(null);
+export function Academy({ api, courses, onChanged, notify, initialCourseId = null }: { api: ApiClient; courses: Resource<Course[]>; onChanged: () => void; notify: (message: string) => void; initialCourseId?: number | null }) {
+  const [selected, setSelected] = useState<number | null>(initialCourseId);
+  useEffect(() => { setSelected(initialCourseId); }, [initialCourseId]);
   return <><PageHeading eyebrow="JANA ACADEMY" title="Ваш следующий шаг" description="Знания, которые помогают чувствовать себя увереннее каждый день." /><div className="academy-banner"><span className="metric-icon mint"><Icon name="book" size={27} /></span><div><h2>Растём вместе</h2><p>Изучите материал и пройдите тест, чтобы завершить назначенный курс.</p></div><span className="academy-total">{courses.data ? `${courses.data.filter((course) => course.completed).length} / ${courses.data.length}` : "—"}<small>курсов завершено</small></span></div>{courses.error ? <ErrorBox message={courses.error} retry={courses.reload} /> : courses.loading && !courses.data ? <Loading /> : !courses.data?.length ? <section className="panel"><Empty icon="book" title="Ваше обучение ещё впереди" text="Когда вам назначат курс, он появится здесь." /></section> : <div className="courses-grid">{courses.data.map((course, index) => <article className="panel course-card" key={course.id}><div className={`course-card-cover cover-${index % 3}`}><span className="small-label">JANA ACADEMY</span><Icon name={index % 2 ? "shield" : "leaf"} size={64} /><span className="course-cover-arrow">↗</span>{course.completed && <span className="course-completed"><Icon name="check" size={14} /> Пройден</span>}</div><div className="course-card-body"><span className="course-meta"><Icon name="clock" size={14} />{course.duration_minutes} мин.<span>·</span>Назначенный курс</span><h2>{course.title}</h2><p>{course.description}</p><div className="progress-label"><span>Прогресс</span><strong>{course.progress}%</strong></div><progress value={course.progress} max={100} aria-label={`Прогресс: ${course.title}`} /><button className="button button-secondary" onClick={() => setSelected(course.id)}>{course.completed ? "Повторить материал" : course.progress ? "Продолжить" : "Начать обучение"}<Icon name="arrow" size={17} /></button></div></article>)}</div>}{selected !== null && <CourseReader key={selected} id={selected} api={api} onClose={() => setSelected(null)} onChanged={onChanged} notify={notify} />}</>;
 }
 

@@ -37,14 +37,14 @@ class LeaveRequest(Base):
     __table_args__ = (
         UniqueConstraint("employee_id", "idempotency_key", name="uq_request_idempotency"),
         CheckConstraint("end_date >= start_date", name="ck_request_dates"),
-        CheckConstraint("status IN ('submitted','manager_approved','approved','rejected')", name="ck_request_status"),
+        CheckConstraint("status IN ('submitted','manager_approved','approved','rejected','withdrawn','cancellation_requested','cancelled')", name="ck_request_status"),
     )
     id: Mapped[int] = mapped_column(primary_key=True)
     employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id"), index=True)
     start_date: Mapped[date] = mapped_column(Date)
     end_date: Mapped[date] = mapped_column(Date)
     comment: Mapped[str] = mapped_column(Text, default="")
-    status: Mapped[str] = mapped_column(String(20), default="submitted")
+    status: Mapped[str] = mapped_column(String(30), default="submitted")
     version: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     idempotency_key: Mapped[str] = mapped_column(String(128))
@@ -73,7 +73,7 @@ class RequestHistory(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     request_id: Mapped[int] = mapped_column(ForeignKey("leave_requests.id"), index=True)
     actor_id: Mapped[int] = mapped_column(ForeignKey("employees.id"))
-    status: Mapped[str] = mapped_column(String(20))
+    status: Mapped[str] = mapped_column(String(30))
     comment: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -117,6 +117,31 @@ class DocumentologDelivery(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class LeaveCancellation(Base):
+    __tablename__ = "leave_cancellations"
+    __table_args__ = (CheckConstraint("status IN ('pending','synced','error')", name="ck_leave_cancellation_status"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    request_id: Mapped[int] = mapped_column(ForeignKey("leave_requests.id"), unique=True)
+    actor_id: Mapped[int] = mapped_column(ForeignKey("employees.id"))
+    command_key: Mapped[str] = mapped_column(String(128), unique=True)
+    payload_json: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    reference: Mapped[str | None] = mapped_column(String(100))
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    last_error: Mapped[str | None] = mapped_column(String(500))
+    next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class RequestCommand(Base):
+    __tablename__ = "request_commands"
+    __table_args__ = (UniqueConstraint("actor_id", "command_key", name="uq_request_command"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    actor_id: Mapped[int] = mapped_column(ForeignKey("employees.id"))
+    command_key: Mapped[str] = mapped_column(String(128))
+    payload_hash: Mapped[str] = mapped_column(String(64))
+    result_id: Mapped[int] = mapped_column(ForeignKey("leave_requests.id"))
+
+
 class Notification(Base):
     __tablename__ = "notifications"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -126,6 +151,9 @@ class Notification(Base):
     body: Mapped[str] = mapped_column(Text)
     read: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    entity_type: Mapped[str | None] = mapped_column(String(30))
+    entity_id: Mapped[int | None] = mapped_column(Integer)
+    actor_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"))
 
 
 class Course(Base):

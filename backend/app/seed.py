@@ -45,7 +45,7 @@ def seed():
         for employee in db.scalars(select(Employee)).all():
             if db.scalar(select(CourseAssignment).where(CourseAssignment.employee_id == employee.id, CourseAssignment.course_id == 1)) is None:
                 db.add(CourseAssignment(employee_id=employee.id, course_id=1))
-                notify(db, employee.id, "course_assigned", "Вам назначен курс", "Начните с курса «Знакомство с JanaМен».")
+                notify(db, employee.id, "course_assigned", "Вам назначен курс", "Начните с курса «Знакомство с JanaМен».", entity_type="course", entity_id=1, actor_id=3)
                 record(db, 3, "course.assigned", "employee", employee.id)
         knowledge = [
             (1, "Как подать заявку на отпуск", "Заявки", "В прототипе откройте «Заявки», выберите даты и отправьте заявку. Период рассчитывает HTTP mock 1С:ЗУП: календарные дни включительно без национальных и государственных праздничных дат Казахстана; обычные и перенесённые выходные учитываются. Сначала её согласует непосредственный руководитель, затем финальное решение принимает HR. Только финальное одобрение списывает дни; ожидающие и отклонённые заявки не меняют остаток. Это демонстрационное правило, а не кадровая политика Jana Post.", "отпуск,заявк,статус,соглас,остат,дн", "all"),
@@ -88,11 +88,11 @@ def seed():
                     db.add(RequestHistory(request_id=request.id, actor_id=3, status="approved", comment="Финально согласовано HR"))
                     record(db, 2, "request.manager_approved", "request", request.id)
                     record(db, 3, "request.approved", "request", request.id)
-                    notify(db, 1, "request_status", "Демонстрационное решение по заявке", f"Заявка №{request.id}: {status}")
+                    notify(db, 1, "request_status", "Демонстрационное решение по заявке", f"Заявка №{request.id}: {status}", entity_type="request", entity_id=request.id, actor_id=3)
                 elif status == "rejected":
                     db.add(RequestHistory(request_id=request.id, actor_id=2, status=status, comment="Отклонено руководителем"))
                     record(db, 2, f"request.{status}", "request", request.id)
-                    notify(db, 1, "request_status", "Демонстрационное решение по заявке", f"Заявка №{request.id}: {status}")
+                    notify(db, 1, "request_status", "Демонстрационное решение по заявке", f"Заявка №{request.id}: {status}", entity_type="request", entity_id=request.id, actor_id=2)
         db.commit()
     print("Демо-данные готовы. Существующие записи и пароли сохранены.")
 

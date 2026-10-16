@@ -54,7 +54,7 @@ def complete(course_id: int, data: Completion, user: Employee = Depends(current_
         raise HTTPException(422, "Ответ неверный. Прочитайте материал и попробуйте ещё раз")
     changed = db.execute(update(CourseAssignment).where(CourseAssignment.id == a.id, CourseAssignment.completed.is_(False)).values(progress=100, completed=True).execution_options(synchronize_session=False))
     if changed.rowcount:
-        notify(db, user.id, "course_completed", "Курс завершён", f"Вы прошли «{c.title}».")
+        notify(db, user.id, "course_completed", "Курс завершён", f"Вы прошли «{c.title}».", entity_type="course", entity_id=c.id, actor_id=user.id)
         record(db, user.id, "course.completed", "course", course_id)
     db.commit()
     db.refresh(a)

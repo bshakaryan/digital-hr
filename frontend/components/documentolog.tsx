@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ApiClient, errorMessage, type Profile } from "@/lib/api";
 import { ErrorBox, Icon, Loading } from "./ui";
 import { useResource } from "./use-resource";
@@ -23,6 +23,11 @@ export function DocumentologDocument({ api, id, me }: { api: ApiClient; id: numb
   const [recipient, setRecipient] = useState("");
   const [link, setLink] = useState("");
   const item = resource.data;
+  useEffect(() => {
+    if (!item || !["signing", "creating", "needs_review", "completed_reported"].includes(item.status)) return;
+    const timer = setInterval(() => { if (document.visibilityState === "visible") resource.reload(); }, 15000);
+    return () => clearInterval(timer);
+  }, [item?.status, resource.reload]);
   async function create() {
     setPending(true); setError("");
     try {

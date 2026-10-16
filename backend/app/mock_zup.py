@@ -13,7 +13,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import Field
 
 from app.modules.integrations import DemoZupFixtures
-from app.schemas import RequestCreate
+from app.schemas import Input, RequestCreate
 from app.zup_calendar import calculate_days
 
 PREFIX = "/hs/jana/v1"
@@ -26,6 +26,11 @@ class QuoteInput(RequestCreate):
 class DocumentInput(QuoteInput):
     days_count: int = Field(gt=0)
     calendar_version: str
+
+
+class CancellationInput(Input):
+    employee_id: str = Field(min_length=1, max_length=100)
+    original_command_key: str = Field(min_length=8, max_length=128)
 
 
 def create_mock_app(database_path: str, token: str) -> FastAPI:
@@ -48,6 +53,7 @@ def create_mock_app(database_path: str, token: str) -> FastAPI:
         with connect() as db:
             db.execute("CREATE TABLE IF NOT EXISTS balances (employee_id TEXT PRIMARY KEY, initial_days INTEGER NOT NULL)")
             db.execute("CREATE TABLE IF NOT EXISTS documents (command_key TEXT PRIMARY KEY, payload_hash TEXT NOT NULL, employee_id TEXT NOT NULL, days INTEGER NOT NULL, reference TEXT NOT NULL, start_date TEXT NOT NULL, end_date TEXT NOT NULL)")
+            db.execute("CREATE TABLE IF NOT EXISTS cancellations (command_key TEXT PRIMARY KEY, payload_hash TEXT NOT NULL, original_command_key TEXT NOT NULL UNIQUE REFERENCES documents(command_key), reference TEXT NOT NULL)")
             for employee in DemoZupFixtures().employees():
                 db.execute("INSERT OR IGNORE INTO balances VALUES (?, ?)", (employee.zup_id, employee.leave_balance))
         yield
@@ -62,8 +68,8 @@ def create_mock_app(database_path: str, token: str) -> FastAPI:
         employee = db.execute("SELECT initial_days FROM balances WHERE employee_id=?", (employee_id,)).fetchone()
         if employee is None:
             raise HTTPException(404, "Сотрудник не найден в mock 1С:ЗУП")
-        documents = db.execute("SELECT command_key,days FROM documents WHERE employee_id=?", (employee_id,)).fetchall()
-        return {"employee_id": employee_id, "balance": employee["initial_days"] - sum(row["days"] for row in documents),
+        documents = db.execute("SELECT d.command_key,d.days,c.command_key AS cancellation FROM documents d LEFT JOIN cancellations c ON c.original_command_key=d.command_key WHERE d.employee_id=?", (employee_id,)).fetchall()
+        return {"employee_id": employee_id, "balance": employee["initial_days"] - sum(row["days"] for row in documents if not row["cancellation"]),
                 "applied_commands": [row["command_key"] for row in documents], "source": "mock_zup_http"}
 
     @service.get("/health")
@@ -86,7 +92,7 @@ def create_mock_app(database_path: str, token: str) -> FastAPI:
     def calculate(data: QuoteInput):
         with connect() as db:
             current = balance(db, data.employee_id)
-            if db.execute("SELECT 1 FROM documents WHERE employee_id=? AND start_date<=? AND end_date>=?", (data.employee_id, data.end_date.isoformat(), data.start_date.isoformat())).fetchone():
+            if db.execute("SELECT 1 FROM documents d WHERE employee_id=? AND start_date<=? AND end_date>=? AND NOT EXISTS (SELECT 1 FROM cancellations c WHERE c.original_command_key=d.command_key)", (data.employee_id, data.end_date.isoformat(), data.start_date.isoformat())).fetchone():
                 raise HTTPException(409, "Период пересекается с отпуском в mock 1С:ЗУП")
         try:
             result = calculate_days(data.start_date, data.end_date)
@@ -112,12 +118,31 @@ def create_mock_app(database_path: str, token: str) -> FastAPI:
                 raise HTTPException(409, "Расчёт не совпадает с календарём mock 1С:ЗУП")
             if balance(db, data.employee_id)["balance"] < data.days_count:
                 raise HTTPException(409, "В mock 1С:ЗУП недостаточно дней")
-            overlap = db.execute("SELECT 1 FROM documents WHERE employee_id=? AND start_date<=? AND end_date>=?", (data.employee_id, data.end_date.isoformat(), data.start_date.isoformat())).fetchone()
+            overlap = db.execute("SELECT 1 FROM documents d WHERE employee_id=? AND start_date<=? AND end_date>=? AND NOT EXISTS (SELECT 1 FROM cancellations c WHERE c.original_command_key=d.command_key)", (data.employee_id, data.end_date.isoformat(), data.start_date.isoformat())).fetchone()
             if overlap:
                 raise HTTPException(409, "Период пересекается с зарегистрированным отпуском")
             reference = "ZUP-" + hashlib.sha256(idempotency_key.encode()).hexdigest()[:16]
             db.execute("INSERT INTO documents VALUES (?,?,?,?,?,?,?)", (idempotency_key, digest, data.employee_id, data.days_count, reference, data.start_date.isoformat(), data.end_date.isoformat()))
             return {"reference": reference, "command_key": idempotency_key, "status": "registered"}
+
+    @service.post(PREFIX + "/leave/cancellations", dependencies=[Depends(authorize)], status_code=201)
+    def cancel(data: CancellationInput, idempotency_key: Annotated[str, Header(min_length=8, max_length=128)]):
+        digest = hashlib.sha256(data.model_dump_json().encode()).hexdigest()
+        with connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            previous = db.execute("SELECT * FROM cancellations WHERE command_key=?", (idempotency_key,)).fetchone()
+            if previous:
+                if previous["payload_hash"] != digest:
+                    raise HTTPException(409, "Ключ отмены использован с другим телом")
+                return {"reference": previous["reference"], "command_key": idempotency_key, "status": "cancelled"}
+            original = db.execute("SELECT * FROM documents WHERE command_key=? AND employee_id=?", (data.original_command_key, data.employee_id)).fetchone()
+            if original is None:
+                raise HTTPException(409, "Исходный отпуск ещё не зарегистрирован")
+            if db.execute("SELECT 1 FROM cancellations WHERE original_command_key=?", (data.original_command_key,)).fetchone():
+                raise HTTPException(409, "Отпуск уже отменён другой командой")
+            reference = "ZUP-CANCEL-" + hashlib.sha256(idempotency_key.encode()).hexdigest()[:16]
+            db.execute("INSERT INTO cancellations VALUES (?,?,?,?)", (idempotency_key, digest, data.original_command_key, reference))
+            return {"reference": reference, "command_key": idempotency_key, "status": "cancelled"}
 
     @service.get(PREFIX + "/leave/documents", dependencies=[Depends(authorize)])
     def documents():

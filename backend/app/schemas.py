@@ -1,9 +1,10 @@
 from datetime import date, datetime, timezone
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 UTCDateTime = Annotated[datetime, AfterValidator(lambda value: value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc))]
+RequestStatus = Literal["submitted", "manager_approved", "approved", "rejected", "withdrawn", "cancellation_requested", "cancelled"]
 
 
 class Input(BaseModel):
@@ -54,6 +55,22 @@ class RequestDecision(Input):
     comment: str = Field(default="", max_length=2000)
 
 
+class LifecycleCommand(Input):
+    version: int = Field(ge=1)
+    comment: str = Field(min_length=1, max_length=2000)
+
+    @field_validator("comment")
+    @classmethod
+    def reason_not_blank(cls, value):
+        if not value.strip():
+            raise ValueError("Укажите причину")
+        return value
+
+
+class RequestReplacement(RequestCreate):
+    version: int = Field(ge=1)
+
+
 class LeaveCalculation(BaseModel):
     start_date: date
     end_date: date
@@ -68,7 +85,7 @@ class LeaveCalculation(BaseModel):
 
 
 class HistoryOut(BaseModel):
-    status: Literal["submitted", "manager_approved", "approved", "rejected"]
+    status: RequestStatus
     actor_name: str
     comment: str
     created_at: UTCDateTime
@@ -87,10 +104,16 @@ class RequestOut(BaseModel):
     zup_sync_status: Literal["not_required", "pending", "synced", "error", "legacy"]
     zup_reference: str | None
     comment: str
-    status: Literal["submitted", "manager_approved", "approved", "rejected"]
+    status: RequestStatus
     version: int
     created_at: UTCDateTime
     history: list[HistoryOut]
+    calendar_days: int
+    can_review: bool = False
+    cancellation_sync_status: Literal["pending", "synced", "error"] | None = None
+    cancellation_reference: str | None = None
+    cancellation_allowed: bool = False
+    cancellation_block_reason: str | None = None
 
 
 class NotificationOut(BaseModel):
@@ -101,6 +124,10 @@ class NotificationOut(BaseModel):
     body: str
     read: bool
     created_at: UTCDateTime
+    entity_type: str | None = None
+    entity_id: int | None = None
+    actor_id: int | None = None
+    actor_name: str | None = None
 
 
 class CourseOut(BaseModel):
@@ -149,3 +176,14 @@ class AuditOut(BaseModel):
     entity_type: str
     entity_id: int
     created_at: UTCDateTime
+    actor_name: str = ""
+    action_label: str = ""
+    employee_id: int | None = None
+    employee_name: str | None = None
+
+
+class AuditPage(BaseModel):
+    items: list[AuditOut]
+    total: int
+    page: int
+    page_size: int

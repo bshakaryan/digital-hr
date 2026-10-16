@@ -134,6 +134,17 @@ class HttpZupAdapter:
         except (ValidationError, ValueError) as error:
             raise HTTPException(503, f"Некорректная квитанция: {self.source_title}") from error
 
+    def cancel(self, body: dict, key: str) -> ZupReceipt:
+        if self.mode != "mock":
+            raise HTTPException(409, "Для реальной 1С не согласован контракт отмены")
+        try:
+            receipt = ZupReceipt.model_validate(self.call("POST", "/leave/cancellations", body, key))
+            if receipt.command_key != key or receipt.status != "cancelled":
+                raise ValueError("Unexpected cancellation receipt")
+            return receipt
+        except (ValidationError, ValueError) as error:
+            raise HTTPException(503, "Некорректная квитанция отмены 1С") from error
+
 
 def zup_adapter() -> HttpZupAdapter:
     settings = get_settings()

@@ -8,7 +8,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Employee, LeaveDeduction, LeaveRequest, RequestHistory, ZupDelivery
+from app.config import get_settings
+from app.models import DocumentologDelivery, Employee, LeaveCancellation, LeaveDeduction, LeaveRequest, RequestHistory, ZupDelivery, utcnow
 from app.modules.audit import record
 from app.modules.leave_balance import quote_leave
 from app.modules.notifications import notify
@@ -19,10 +20,30 @@ from app.security import current_user, visible_employee_ids
 router = APIRouter(prefix="/requests", tags=["requests"])
 
 
-def present(db: Session, item: LeaveRequest) -> RequestOut:
+def review_allowed(user, employee, item):
+    return bool(user and user.id != item.employee_id and (
+        (item.status == "submitted" and user.role == "manager" and employee.manager_id == user.id) or
+        (item.status in ("manager_approved", "cancellation_requested") and user.role == "hr_admin")))
+
+
+def cancellation_block_reason(db, item):
+    if get_settings().zup_mode != "mock":
+        return "Контракт отмены для реальной 1С ещё не согласован"
+    if item.start_date <= utcnow().date():
+        return "Демо поддерживает отмену только до начала отпуска"
+    if not db.scalar(select(ZupDelivery.id).where(ZupDelivery.request_id == item.id)):
+        return "Исторический отпуск требует ручной сверки с источником"
+    if db.scalar(select(DocumentologDelivery.id).where(DocumentologDelivery.request_id == item.id)):
+        return "Сначала требуется согласовать аннулирование документа Documentolog"
+    return None
+
+
+def present(db: Session, item: LeaveRequest, user=None) -> RequestOut:
     employee = db.get(Employee, item.employee_id)
     history = db.execute(select(RequestHistory, Employee.full_name).join(Employee, Employee.id == RequestHistory.actor_id).where(RequestHistory.request_id == item.id).order_by(RequestHistory.id)).all()
     delivery = db.scalar(select(ZupDelivery).where(ZupDelivery.request_id == item.id))
+    cancellation = db.scalar(select(LeaveCancellation).where(LeaveCancellation.request_id == item.id))
+    reason = cancellation_block_reason(db, item) if item.status in ("approved", "cancellation_requested") else None
     return RequestOut(
         id=item.id, employee_id=item.employee_id, employee_name=employee.full_name,
         start_date=item.start_date, end_date=item.end_date,
@@ -33,6 +54,12 @@ def present(db: Session, item: LeaveRequest) -> RequestOut:
         zup_reference=delivery.reference if delivery else None, comment=item.comment,
         status=item.status, version=item.version, created_at=item.created_at,
         history=[HistoryOut(status=h.status, actor_name=name, comment=h.comment, created_at=h.created_at) for h, name in history],
+        calendar_days=(item.end_date - item.start_date).days + 1,
+        can_review=review_allowed(user, employee, item),
+        cancellation_allowed=item.status == "approved" and reason is None,
+        cancellation_block_reason=reason,
+        cancellation_sync_status=cancellation.status if cancellation else None,
+        cancellation_reference=cancellation.reference if cancellation else None,
     )
 
 
@@ -46,7 +73,13 @@ def accessible(db: Session, user: Employee, request_id: int):
 @router.get("", response_model=list[RequestOut])
 def requests(user: Employee = Depends(current_user), db: Session = Depends(get_db)):
     items = db.scalars(select(LeaveRequest).where(LeaveRequest.employee_id.in_(visible_employee_ids(db, user))).order_by(LeaveRequest.id.desc())).all()
-    return [present(db, item) for item in items]
+    return [present(db, item, user) for item in items]
+
+
+@router.get("/review-queue", response_model=list[RequestOut])
+def review_queue(user: Employee = Depends(current_user), db: Session = Depends(get_db)):
+    items = requests(user, db)
+    return sorted((item for item in items if item.can_review), key=lambda item: item.history[-1].created_at if item.history else item.created_at)
 
 
 @router.post("/calculate", response_model=LeaveCalculation)
@@ -59,7 +92,7 @@ def calculate(data: RequestCreate, user: Employee = Depends(current_user), db: S
         sufficient_balance=available >= quote.days_count)
 
 
-def ensure_no_overlap(db: Session, employee_id: int, start, end, excluding=None, statuses=("submitted", "manager_approved", "approved")):
+def ensure_no_overlap(db: Session, employee_id: int, start, end, excluding=None, statuses=("submitted", "manager_approved", "approved", "cancellation_requested")):
     query = select(LeaveRequest.id).where(LeaveRequest.employee_id == employee_id,
         LeaveRequest.status.in_(statuses), LeaveRequest.start_date <= end, LeaveRequest.end_date >= start)
     if excluding is not None:
@@ -79,14 +112,26 @@ def create_request(data: RequestCreate, idempotency_key: Annotated[str, Header(m
     if item:
         if item.payload_hash != digest:
             raise HTTPException(409, "Этот ключ уже использован с другими данными")
-        return present(db, item)
+        return present(db, item, user)
     user = db.scalar(select(Employee).where(Employee.id == user.id).with_for_update())
     # Recheck after acquiring the employee lock for simultaneous creations.
     item = previous()
     if item:
         if item.payload_hash != digest:
             raise HTTPException(409, "Этот ключ уже использован с другими данными")
-        return present(db, item)
+        return present(db, item, user)
+    try:
+        item = new_request(db, user, data, idempotency_key, digest)
+    except IntegrityError:
+        db.rollback()
+        item = previous()
+        if item is None or item.payload_hash != digest:
+            raise HTTPException(409, "Конфликт повторной команды")
+    db.commit()
+    return present(db, item, user)
+
+
+def new_request(db, user, data, idempotency_key, digest):
     manager = db.get(Employee, user.manager_id) if user.manager_id is not None else None
     if manager is None or manager.role != "manager":
         raise HTTPException(409, "Для сотрудника не настроен маршрут согласования с непосредственным руководителем")
@@ -97,32 +142,24 @@ def create_request(data: RequestCreate, idempotency_key: Annotated[str, Header(m
     item = LeaveRequest(employee_id=user.id, start_date=data.start_date, end_date=data.end_date, comment=data.comment, idempotency_key=idempotency_key, payload_hash=digest,
         days_count=quote.days_count, excluded_dates_json=json.dumps([day.isoformat() for day in quote.excluded_dates]), calendar_version=quote.calendar_version)
     db.add(item)
-    try:
-        db.flush()
-    except IntegrityError:
-        # Unique constraint is the final protection against concurrent retries.
-        db.rollback()
-        item = previous()
-        if item is None or item.payload_hash != digest:
-            raise HTTPException(409, "Конфликт повторной команды")
-        return present(db, item)
+    db.flush()
     db.add(RequestHistory(request_id=item.id, actor_id=user.id, status="submitted", comment=data.comment))
     record(db, user.id, "request.created", "request", item.id)
-    notify(db, user.id, "request_submitted", "Заявка отправлена", f"Заявка №{item.id} ожидает решения руководителя.")
-    notify(db, manager.id, "request_manager_review", "Новая заявка на отпуск", f"{user.full_name}: заявка №{item.id} ожидает решения руководителя.")
-    db.commit()
-    return present(db, item)
+    notify(db, user.id, "request_submitted", "Заявка отправлена", f"Заявка №{item.id} ожидает решения руководителя.", entity_type="request", entity_id=item.id, actor_id=user.id)
+    notify(db, manager.id, "request_manager_review", "Новая заявка на отпуск", f"{user.full_name}: заявка №{item.id} ожидает решения руководителя.", entity_type="request", entity_id=item.id, actor_id=user.id)
+    return item
 
 
 @router.get("/{request_id}", response_model=RequestOut)
 def get_request(request_id: int, user: Employee = Depends(current_user), db: Session = Depends(get_db)):
-    return present(db, accessible(db, user, request_id))
+    return present(db, accessible(db, user, request_id), user)
 
 
 @router.patch("/{request_id}/status", response_model=RequestOut)
 def decide(request_id: int, data: RequestDecision, user: Employee = Depends(current_user), db: Session = Depends(get_db)):
     item = accessible(db, user, request_id)
-    owner = db.get(Employee, item.employee_id)
+    owner = db.scalar(select(Employee).where(Employee.id == item.employee_id).with_for_update())
+    db.refresh(item)
     if user.id == item.employee_id:
         raise HTTPException(403, "Нельзя принять решение по этой заявке")
     current_status = item.status
@@ -150,7 +187,7 @@ def decide(request_id: int, data: RequestDecision, user: Employee = Depends(curr
         # different requests for one employee in PostgreSQL; SQLite tests cannot
         # establish that locking guarantee.
         owner = db.scalar(select(Employee).where(Employee.id == item.employee_id).with_for_update())
-        ensure_no_overlap(db, owner.id, item.start_date, item.end_date, excluding=item.id, statuses=("approved",))
+        ensure_no_overlap(db, owner.id, item.start_date, item.end_date, excluding=item.id, statuses=("approved", "cancellation_requested"))
         quote, available = quote_leave(db, owner, item.start_date, item.end_date)
         if not item.calendar_version.startswith("legacy-") and (item.days_count != quote.days_count or item.calendar_version != quote.calendar_version or json.loads(item.excluded_dates_json) != [day.isoformat() for day in quote.excluded_dates]):
             db.rollback()
@@ -169,18 +206,18 @@ def decide(request_id: int, data: RequestDecision, user: Employee = Depends(curr
     db.add(RequestHistory(request_id=request_id, actor_id=user.id, status=next_status, comment=data.comment))
     record(db, user.id, f"request.{next_status}", "request", request_id)
     if next_status == "manager_approved":
-        notify(db, item.employee_id, "request_manager_approved", "Руководитель согласовал заявку", f"Заявка №{item.id} передана на финальную проверку HR. {data.comment}")
+        notify(db, item.employee_id, "request_manager_approved", "Руководитель согласовал заявку", f"Заявка №{item.id} передана на финальную проверку HR. {data.comment}", entity_type="request", entity_id=item.id, actor_id=user.id)
         for hr in db.scalars(select(Employee).where(Employee.role == "hr_admin", Employee.id != item.employee_id)).all():
-            notify(db, hr.id, "request_hr_review", "Заявка ожидает решения HR", f"{owner.full_name}: заявка №{item.id} согласована руководителем.")
+            notify(db, hr.id, "request_hr_review", "Заявка ожидает решения HR", f"{owner.full_name}: заявка №{item.id} согласована руководителем.", entity_type="request", entity_id=item.id, actor_id=user.id)
     else:
         label = "одобрена" if next_status == "approved" else "отклонена"
         balance_text = "" if remaining_balance is None else f" Списано {item.days_count} календ. дн. без праздников; доступный остаток — {remaining_balance}."
-        notify(db, item.employee_id, "request_status", f"Заявка {label}", f"Заявка №{item.id}: решение принял(а) {user.full_name}.{balance_text} {data.comment}")
+        notify(db, item.employee_id, "request_status", f"Заявка {label}", f"Заявка №{item.id}: решение принял(а) {user.full_name}.{balance_text} {data.comment}", entity_type="request", entity_id=item.id, actor_id=user.id)
     db.commit()
     if remaining_balance is not None:
         deliver(db, request_id)
     db.refresh(item)
-    return present(db, item)
+    return present(db, item, user)
 
 
 @router.post("/{request_id}/sync", response_model=RequestOut)
@@ -191,4 +228,4 @@ def retry_sync(request_id: int, user: Employee = Depends(current_user), db: Sess
     if not db.scalar(select(ZupDelivery.id).where(ZupDelivery.request_id == request_id)):
         raise HTTPException(409, "Для этой заявки нет команды передачи в 1С:ЗУП")
     deliver(db, request_id)
-    return present(db, item)
+    return present(db, item, user)

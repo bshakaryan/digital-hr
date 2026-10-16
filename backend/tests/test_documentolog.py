@@ -109,6 +109,16 @@ def test_submission_requires_hr_approval(api, docs):
     assert api.post(url, {}, "hr").status_code == 409
 
 
+def test_existing_document_blocks_cancellation_without_changing_accounting(api, docs):
+    item = approved(api)
+    assert api.post(f"/api/requests/{item['id']}/documentolog", {}, "hr").status_code == 200
+    before = api.db.snapshot()
+    response = api.client.post(f"/api/requests/{item['id']}/cancel", json={"version": item["version"], "comment": "Cancel"}, headers={**api.headers(), "Idempotency-Key": "cancel-with-document"})
+    assert response.status_code == 409
+    assert api.db.snapshot() == before
+    assert not api.get(f"/api/requests/{item['id']}").json()["cancellation_allowed"]
+
+
 def test_partial_signature_out_of_order_and_external_id(api, docs):
     item = approved(api)
     url = f"/api/requests/{item['id']}/documentolog"

@@ -5,11 +5,11 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.database import get_db
-from app.modules import academy, assistant, audit, auth, documentolog, employees, notifications, requests, zup
+from app.modules import academy, assistant, audit, auth, documentolog, employees, lifecycle, notifications, requests, zup
 
-app = FastAPI(title="JanaМен Digital HR", version="0.2.0", description="Демонстрационный HR-прототип. Кадровые данные и база знаний вымышленные.")
+app = FastAPI(title="JanaМен Digital HR", version="0.3.0", description="Демонстрационный HR-прототип. Кадровые данные и база знаний вымышленные.")
 app.add_middleware(CORSMiddleware, allow_origins=get_settings().cors_origins.split(","), allow_credentials=False, allow_methods=["GET", "POST", "PATCH"], allow_headers=["Authorization", "Content-Type", "Idempotency-Key"])
-for module in (auth, employees, requests, academy, notifications, assistant, audit, zup, documentolog):
+for module in (auth, employees, requests, lifecycle, academy, notifications, assistant, audit, zup, documentolog):
     app.include_router(module.router, prefix="/api")
 
 

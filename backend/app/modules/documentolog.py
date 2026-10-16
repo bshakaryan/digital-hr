@@ -88,7 +88,9 @@ def create_document(request_id: int, data: PrepareDocument, user: Employee = Dep
     settings = get_settings()
     client = documentolog_client()
     # Lock the request before checking uniqueness: concurrent HR commands serialize.
-    db.scalar(select(LeaveRequest).where(LeaveRequest.id == request_id).with_for_update())
+    db.refresh(item, with_for_update=True)
+    if item.status != "approved":
+        raise HTTPException(409, "Заявка изменилась; документ сейчас недоступен")
     delivery = find(db, request_id, lock=True)
     if delivery is None:
         employee = db.get(Employee, item.employee_id)
@@ -184,6 +186,6 @@ def webhook(token: str, data: Webhook, db: Session = Depends(get_db)):
         record(db, delivery.created_by, f"documentolog.{delivery.status}", "request", delivery.request_id)
         item = db.get(LeaveRequest, delivery.request_id)
         notify(db, item.employee_id, "documentolog_status", "Обновлён статус документа",
-            f"Заявка №{item.id}: Documentolog — {delivery.status}." + (" Демонстрация, ЭЦП не используется." if delivery.mode == "mock" else ""))
+            f"Заявка №{item.id}: Documentolog — {delivery.status}." + (" Демонстрация, ЭЦП не используется." if delivery.mode == "mock" else ""), entity_type="request", entity_id=item.id, actor_id=delivery.created_by)
     db.commit()
     return {"accepted": True, "status": delivery.status}

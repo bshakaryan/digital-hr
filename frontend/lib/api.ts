@@ -13,7 +13,7 @@ export interface Profile {
   data_source: "mock_zup" | "zup";
 }
 
-export type RequestStatus = "submitted" | "manager_approved" | "approved" | "rejected";
+export type RequestStatus = "submitted" | "manager_approved" | "approved" | "rejected" | "withdrawn" | "cancellation_requested" | "cancelled";
 export interface LeaveRequest {
   id: number;
   employee_id: number;
@@ -22,6 +22,12 @@ export interface LeaveRequest {
   start_date: string;
   end_date: string;
   days_count: number;
+  calendar_days: number;
+  can_review: boolean;
+  cancellation_allowed: boolean;
+  cancellation_block_reason: string | null;
+  cancellation_sync_status: "pending" | "synced" | "error" | null;
+  cancellation_reference: string | null;
   excluded_dates: string[];
   calendar_version: string;
   zup_sync_status: "not_required" | "pending" | "synced" | "error" | "legacy";
@@ -40,6 +46,8 @@ export interface LeaveCalculation {
 }
 export interface Notification {
   id: number; kind: string; title: string; body: string; read: boolean; created_at: string;
+  entity_type: "request" | "course" | "employee" | null; entity_id: number | null;
+  actor_id: number | null; actor_name: string | null;
 }
 export interface Course {
   id: number; title: string; description: string; content: string; duration_minutes: number;
@@ -51,7 +59,9 @@ export interface AssistantAnswer {
 }
 export interface AuditEntry {
   id: number; actor_id: number; action: string; entity_type: string; entity_id: number; created_at: string;
+  actor_name: string; action_label: string; employee_id: number | null; employee_name: string | null;
 }
+export interface AuditPage { items: AuditEntry[]; total: number; page: number; page_size: number }
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) { super(message); this.name = "ApiError"; }
@@ -110,11 +120,20 @@ export class ApiClient {
   patch<T>(path: string, body: unknown): Promise<T> {
     return this.call(path, { method: "PATCH", body: JSON.stringify(body) });
   }
+
+  async download(path: string, filename: string) {
+    const response = await fetch(`${(process.env.NEXT_PUBLIC_API_URL || "/api").replace(/\/$/, "")}${path}`, { headers: this.token ? { Authorization: `Bearer ${this.token}` } : {}, cache: "no-store", credentials: "omit" });
+    if (response.status === 401) { this.expired?.(); throw new ApiError("Сессия завершена. Войдите снова.", 401); }
+    if (!response.ok) { const body = await response.json().catch(() => null); throw new ApiError(detailMessage(body?.detail) || "Не удалось выгрузить журнал", response.status); }
+    const url = URL.createObjectURL(await response.blob());
+    const anchor = document.createElement("a"); anchor.href = url; anchor.download = filename; anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
 }
 
 export const errorMessage = (error: unknown) => error instanceof Error ? error.message : "Произошла ошибка. Попробуйте ещё раз.";
 export const roleLabel: Record<Profile["role"], string> = { employee: "Сотрудник", manager: "Руководитель", hr_admin: "HR-администратор" };
-export const statusLabel: Record<RequestStatus, string> = { submitted: "У руководителя", manager_approved: "На проверке HR", approved: "Согласовано", rejected: "Отклонено" };
+export const statusLabel: Record<RequestStatus, string> = { submitted: "У руководителя", manager_approved: "На проверке HR", approved: "Согласовано", rejected: "Отклонено", withdrawn: "Отозвано", cancellation_requested: "Запрошена отмена", cancelled: "Отменено" };
 export const date = (value: string, full = false) => new Intl.DateTimeFormat("ru-RU", {
   day: "numeric", month: full ? "long" : "short", year: "numeric", timeZone: "UTC",
 }).format(new Date(value.length === 10 ? `${value}T00:00:00Z` : value));

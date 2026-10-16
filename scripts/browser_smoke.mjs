@@ -53,7 +53,7 @@ try {
   const employeeHeaders = { Authorization: `Bearer ${employeeToken}` };
   const initialProfile = await (await context.request.get(`${origin}/api/me`, { headers: employeeHeaders })).json();
   const existing = await (await context.request.get(`${origin}/api/requests`, { headers: employeeHeaders })).json();
-  const occupied = existing.filter(item => item.status !== "rejected");
+  const occupied = existing.filter(item => ["submitted", "manager_approved", "approved", "cancellation_requested"].includes(item.status));
   let start = "2027-03-20", end = "2027-03-25";
   if (initialProfile.leave_balance < 3 || occupied.some(item => item.start_date <= end && item.end_date >= start)) {
     start = end = Array.from({ length: 300 }, (_, i) => new Date(Date.UTC(2027, 3, 1 + i)).toISOString().slice(0, 10))
@@ -137,14 +137,14 @@ try {
   await hrReview.getByRole("button", { name: "Подтвердить решение" }).click();
   assert.equal((await hrDecision).status(), 200);
   await hrReview.getByText("HR согласовал заявку", { exact: true }).waitFor();
-  await hrReview.getByText(/Передано в mock 1С:ЗУП/).waitFor();
+  await hrReview.getByText(/Передано в 1С:ЗУП/).waitFor();
   await page.screenshot({ path: `${output}/request-approved.png`, fullPage: true });
   await hrReview.getByRole("button", { name: "Закрыть", exact: true }).click();
   await tab(page, "Журнал аудита");
-  await page.getByText("request.manager_approved", { exact: true }).first().waitFor();
-  await page.getByText("request.approved", { exact: true }).first().waitFor();
-  await page.getByText("zup.leave_registered", { exact: true }).first().waitFor();
-  await tab(page, "Команда");
+  await page.getByText("Руководитель согласовал заявку", { exact: true }).first().waitFor();
+  await page.getByText("HR согласовал заявку", { exact: true }).first().waitFor();
+  await page.getByText("Отпуск передан в 1С", { exact: true }).first().waitFor();
+  await tab(page, "Интеграции и очереди");
   await page.getByRole("heading", { name: "Интеграция 1С:ЗУП" }).waitFor();
   await page.getByText(/Mock 1С:ЗУП подключён по HTTP/).waitFor();
   await page.screenshot({ path: `${output}/zup-integration.png`, fullPage: true });

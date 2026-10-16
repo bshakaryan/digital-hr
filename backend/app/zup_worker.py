@@ -6,8 +6,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_engine
-from app.models import ZupDelivery, utcnow
-from app.modules.zup_sync import deliver
+from app.models import LeaveCancellation, ZupDelivery, utcnow
+from app.modules.zup_sync import deliver, deliver_cancellation
 
 
 def run_once():
@@ -18,6 +18,11 @@ def run_once():
     for request_id in ids:
         with Session(get_engine(), expire_on_commit=False) as db:
             deliver(db, request_id)
+    with Session(get_engine(), expire_on_commit=False) as db:
+        ids = db.scalars(select(LeaveCancellation.request_id).where(LeaveCancellation.status != "synced", LeaveCancellation.next_attempt_at <= utcnow()).order_by(LeaveCancellation.id).limit(50)).all()
+    for request_id in ids:
+        with Session(get_engine(), expire_on_commit=False) as db:
+            deliver_cancellation(db, request_id)
 
 
 if __name__ == "__main__":

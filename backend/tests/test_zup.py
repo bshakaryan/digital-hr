@@ -183,7 +183,8 @@ def test_hr_connection_reports_real_http_and_queue_counts(api):
     assert status.status_code == 200
     assert status.json() == {"connected": True, "mode": "mock_http", "contract": "jana-zup-v1",
                              "auth_type": "bearer", "tls_verified": False,
-                             "mapped_employees": 4, "pending": 0, "error": 0, "synced": 0}
+                             "mapped_employees": 4, "pending": 0, "error": 0, "synced": 0,
+                             "cancellations": {"pending": 0, "error": 0, "synced": 0}}
 
 
 def test_mock_requires_service_auth_and_rejects_changed_command_replay(api):
