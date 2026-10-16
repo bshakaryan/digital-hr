@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 
-from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -90,6 +90,31 @@ class ZupDelivery(Base):
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     last_error: Mapped[str | None] = mapped_column(String(500))
     next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class DocumentologDelivery(Base):
+    __tablename__ = "documentolog_deliveries"
+    __table_args__ = (
+        CheckConstraint("mode IN ('mock','real')", name="ck_documentolog_mode"),
+        CheckConstraint("status IN ('prepared','creating','signing','completed_reported','completed','declined','needs_review')", name="ck_documentolog_status"),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    request_id: Mapped[int] = mapped_column(ForeignKey("leave_requests.id"), unique=True)
+    created_by: Mapped[int] = mapped_column(ForeignKey("employees.id"))
+    command_key: Mapped[str] = mapped_column(String(128), unique=True)
+    mode: Mapped[str] = mapped_column(String(10))
+    status: Mapped[str] = mapped_column(String(30), default="prepared")
+    payload_json: Mapped[str] = mapped_column(Text)
+    file_content: Mapped[bytes] = mapped_column(LargeBinary)
+    file_sha256: Mapped[str] = mapped_column(String(64))
+    file_token: Mapped[str] = mapped_column(String(100), unique=True)
+    callback_token: Mapped[str] = mapped_column(String(100), unique=True)
+    session_url: Mapped[str | None] = mapped_column(Text)
+    external_id: Mapped[str | None] = mapped_column(String(100))
+    view_url: Mapped[str | None] = mapped_column(Text)
+    last_error: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class Notification(Base):

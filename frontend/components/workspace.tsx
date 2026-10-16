@@ -9,6 +9,7 @@ import { Academy } from "./academy";
 import { Assistant } from "./assistant";
 import { Audit } from "./audit";
 import { ZupIntegration } from "./zup-integration";
+import { DocumentologIntegration } from "./documentolog";
 import { LeaveCalendar } from "./leave-calendar";
 
 type Tab = "home" | "profile" | "requests" | "academy" | "assistant" | "notifications" | "team" | "audit";
@@ -98,7 +99,7 @@ export function Workspace({ api, me: initialProfile, onLogout }: { api: ApiClien
       {tab === "academy" && <Academy api={api} courses={courses} onChanged={() => { courses.reload(); notifications.reload(); }} notify={setToast} />}
       {tab === "assistant" && <Assistant api={api} />}
       {tab === "notifications" && <Notifications api={api} resource={notifications} />}
-      {tab === "team" && <>{me.role === "hr_admin" && <ZupIntegration api={api} />}<Team resource={employees} me={me} /></>}
+      {tab === "team" && <>{me.role === "hr_admin" && <><ZupIntegration api={api} /><DocumentologIntegration api={api} /></>}<Team resource={employees} me={me} /></>}
       {tab === "audit" && me.role === "hr_admin" && <Audit api={api} />}
       <footer className="page-footer"><span>JanaМен <span>·</span> Люди в центре всего</span><span>Демонстрационный прототип</span></footer>
     </main></div>

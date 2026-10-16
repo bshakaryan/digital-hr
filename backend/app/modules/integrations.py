@@ -148,13 +148,3 @@ def zup_adapter() -> HttpZupAdapter:
         verify_tls=settings.zup_verify_tls, ca_bundle=settings.zup_ca_bundle,
         client_cert=settings.zup_client_cert, client_key=settings.zup_client_key,
     )
-
-
-class DocumentWorkflowAdapter(Protocol):
-    """Future boundary. Delivery must use a stable idempotency key + outbox."""
-    def submit_leave(self, request_id: int, idempotency_key: str) -> str: ...
-
-
-class UnconfiguredDocumentologAdapter:
-    def submit_leave(self, request_id: int, idempotency_key: str) -> str:
-        raise NotImplementedError("Documentolog не подключён; заявки обрабатываются только внутри MVP")

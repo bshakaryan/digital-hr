@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", hide_input_in_errors=True)
 
     database_url: str = "sqlite:///./jana.db"
     jwt_secret: str = Field(min_length=32)
@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     zup_client_cert: str | None = None
     zup_client_key: str | None = None
     zup_allow_insecure_http: bool = False
+    documentolog_mode: Literal["disabled", "mock", "real"] = "disabled"
+    documentolog_base_url: str = "https://apibusiness.documentolog.com"
+    documentolog_browser_url: str = "https://apibusiness.documentolog.com"
+    documentolog_api_key: str | None = Field(default=None, min_length=32)
+    documentolog_sender: str | None = None
+    documentolog_public_url: str = "http://127.0.0.1:8000"
+    documentolog_callback_url: str = "http://127.0.0.1:8000"
+    documentolog_timeout_seconds: float = Field(default=10, ge=1, le=30)
 
     @model_validator(mode="after")
     def validate_zup_connection(self):
@@ -38,6 +46,18 @@ class Settings(BaseSettings):
             raise ValueError("Для реальной 1С:ЗУП проверка TLS обязательна; исключение допускается только явной настройкой тестового контура")
         if bool(self.zup_client_cert) != bool(self.zup_client_key):
             raise ValueError("ZUP_CLIENT_CERT и ZUP_CLIENT_KEY задаются вместе")
+        if self.documentolog_mode != "disabled":
+            for value in (self.documentolog_base_url, self.documentolog_browser_url,
+                          self.documentolog_public_url, self.documentolog_callback_url):
+                url = urlparse(value)
+                if url.scheme not in ("http", "https") or not url.netloc or url.username or url.password or url.query or url.fragment:
+                    raise ValueError("Documentolog: задайте абсолютные HTTP(S) URL без учётных данных, query и fragment")
+                if self.documentolog_mode == "real" and url.scheme != "https":
+                    raise ValueError("Реальный Documentolog требует HTTPS для API, файлов и webhook")
+            if not self.documentolog_api_key:
+                raise ValueError("Задайте DOCUMENTOLOG_API_KEY")
+            if self.documentolog_mode == "real" and (not self.documentolog_sender or not self.documentolog_sender.isascii() or not self.documentolog_sender.isdigit() or len(self.documentolog_sender) != 12):
+                raise ValueError("DOCUMENTOLOG_SENDER: ИИН/БИН отправителя из 12 цифр")
         return self
 
     @property

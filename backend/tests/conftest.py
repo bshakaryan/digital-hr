@@ -42,6 +42,7 @@ def database(monkeypatch, tmp_path):
     monkeypatch.setenv("JWT_SECRET", TEST_SECRET)
     monkeypatch.setenv("DEMO_PASSWORD", TEST_PASSWORD)
     monkeypatch.setenv("ZUP_API_TOKEN", TEST_SECRET)
+    monkeypatch.setenv("DOCUMENTOLOG_MODE", "disabled")
 
     from app.config import get_settings
     from app.database import Base, get_engine

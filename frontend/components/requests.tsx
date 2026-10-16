@@ -5,6 +5,7 @@ import { ApiClient, ApiError, date, dateTime, errorMessage, initials, type Leave
 import { Empty, ErrorBox, Icon, Loading, Modal, Status } from "./ui";
 import { useResource, type Resource } from "./use-resource";
 import { canReview, PageHeading } from "./workspace";
+import { DocumentologDocument } from "./documentolog";
 
 export function Requests({ me, employees, resource, onCreate, onOpen }: {
   me: Profile; employees: Profile[] | null; resource: Resource<LeaveRequest[]>; onCreate: () => void; onOpen: (id: number) => void;
@@ -62,6 +63,7 @@ export function RequestDetail({ id, api, me, employees, onClose, onChanged, noti
     {item.employee_id === me.id && item.status === "submitted" && <div className="notice"><Icon name="clock" /><span>Заявка ожидает решения непосредственного руководителя. Согласование собственной заявки недоступно.</span></div>}
     {item.employee_id === me.id && item.status === "manager_approved" && <div className="notice"><Icon name="clock" /><span>Руководитель согласовал заявку. Она ожидает финального решения HR.</span></div>}
     {me.role === "hr_admin" && item.status === "submitted" && item.employee_id !== me.id && <div className="notice"><Icon name="clock" /><span>HR сможет принять решение после согласования непосредственного руководителя.</span></div>}
+    {item.status === "approved" && <DocumentologDocument api={api} id={id} me={me} />}
     <div className="detail-footnote">Создана {dateTime(item.created_at)} · Решение сохраняется внутри прототипа</div></>}
   </Modal>;
 }

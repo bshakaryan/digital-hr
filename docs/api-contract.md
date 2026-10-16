@@ -1,6 +1,6 @@
 # API Digital HR v0.2
 
-Это целевой контракт первой реализации. Наличие маршрутов проверяется тестами и OpenAPI; статус реализации перечислен в verification.md. Префикс /api. JSON, даты YYYY-MM-DD, время UTC ISO 8601. Bearer JWT для всех маршрутов кроме login и health. Ошибки: {"detail": "сообщение"}; валидация FastAPI — detail массив.
+Наличие маршрутов проверяется тестами и OpenAPI; статус реализации перечислен в verification.md. Префикс /api. JSON, даты YYYY-MM-DD, время UTC ISO 8601. Bearer JWT для всех маршрутов кроме login, health и capability-маршрутов Documentolog ниже. Ошибки: {"detail": "сообщение"}; валидация FastAPI — detail массив.
 
 ## Вход и профиль
 
@@ -26,7 +26,18 @@
 
 `calendar_version="legacy-deducted"` сохраняет число ранее списанных дней по прежнему правилу. Для него `excluded_dates=[]`; современный календарь не переопределяет исторический расчёт.
 
-Повтор POST с тем же ключом и телом возвращает тот же id (201); другое тело — 409. Создание и промежуточное согласование не резервируют остаток; поэтому конкурирующая ожидающая заявка может получить 409 при финальном решении HR. Повтор финального решения не создаёт второе списание. Отправка в Documentolog в MVP отсутствует.
+Повтор POST с тем же ключом и телом возвращает тот же id (201); другое тело — 409. Создание и промежуточное согласование не резервируют остаток; поэтому конкурирующая ожидающая заявка может получить 409 при финальном решении HR. Повтор финального решения не создаёт второе списание. Документ в Documentolog создаётся отдельной явной командой HR после одобрения.
+
+## Documentolog
+
+- GET /api/requests/{id}/documentolog — доступ по видимости заявки; `{status,mode,external_id?,view_url?,file_sha256?,last_error?,expires_at?}`. Режим `disabled|mock|real`; статус `not_created|prepared|creating|signing|completed_reported|completed|declined|needs_review`. `completed` — завершённая **имитация** в mock; `completed_reported` — непроверенное сообщение реального сервиса, не подтверждённая ЭЦП.
+- POST /api/requests/{id}/documentolog — только HR, только approved, собственная заявка HR → 403; тело `{recipient?:string}`. Mock использует demo-email, real требует ИИН из 12 цифр. Сохраняет DOCX, SHA-256 и команду, затем однократно создаёт сессию. Возвращает статус и `session_url:string|null`. Повтор возвращает прежнюю команду, другой получатель → 409. При таймауте статус `needs_review`, повторной отправки нет; падение после начала оставляет `creating`, требуется сверка. Режим старой команды не меняется автоматически. Одно заявление на заявку.
+- GET /api/requests/{id}/documentolog/session — только HR; `{url,mode}`, ссылка сессии инициатора. Нет подтверждённой сессии → 409; срок истёк → 404. Не содержит сервисного API-ключа.
+- GET /api/documentolog/files/{token} — без JWT, отдельный случайный capability-токен; сохранённый DOCX, `no-store`, срок 30 дней. Неизвестный/просроченный токен → 404.
+- POST /api/documentolog/webhook/{token} — без JWT, другой случайный capability-токен; `{event,doc_id,document?:URL,...}`. Принимает `document_sent|signer_signed|signer_declined|document_completed`. Подпись участника не завершает документ. Другой doc_id → 409, неизвестное событие → 422. Повтор не создаёт второй эффект; завершённый статус не ухудшается запоздавшими событиями. Разрешённая ссылка — только origin Documentolog. В real-режиме событие завершения требует проверки HR. Не меняет решение, остаток и передачу в ЗУП.
+- GET /api/integrations/documentolog — только HR; `{mode,connected,provider,counts,real_connection_verified:false}`. В mock `connected` проверяется через HTTP `/health`. Для real конфигурация не выдаётся за проверенное соединение: без документированного read-only probe не выполняет создающий запрос.
+
+В аудите: `documentolog.prepared`, `creation_started`, `session_created`, `needs_review`, изменения статусов. Capability URL, API-ключи, содержимое документа и получатель не попадают в аудит. Подробности и ограничения: [documentolog-integration.md](documentolog-integration.md).
 
 ## Уведомления
 

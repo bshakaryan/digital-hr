@@ -1,4 +1,23 @@
 services:
+  documentolog-mock:
+    build: ./backend
+    restart: unless-stopped
+    init: true
+    environment:
+      DOCUMENTOLOG_API_KEY: ${DOCUMENTOLOG_API_KEY:-${JWT_SECRET:?Set JWT_SECRET in .env}}
+      DOCUMENTOLOG_MOCK_DATABASE: /app/documentolog-data/documentolog.sqlite3
+      DOCUMENTOLOG_MOCK_BACKEND_URL: http://backend:8000
+      DOCUMENTOLOG_BROWSER_URL: ${DOCUMENTOLOG_BROWSER_URL:-http://localhost:${DOCUMENTOLOG_PORT:-8400}}
+    command: ["uvicorn", "app.mock_documentolog:app_factory", "--factory", "--host", "0.0.0.0", "--port", "8400", "--no-access-log"]
+    ports:
+      - "127.0.0.1:${DOCUMENTOLOG_PORT:-8400}:8400"
+    volumes:
+      - documentolog_mock_data:/app/documentolog-data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8400/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
   zup-mock:
     build: ./backend
     restart: unless-stopped
@@ -46,6 +65,13 @@ services:
       ZUP_CLIENT_CERT: ${ZUP_CLIENT_CERT:-}
       ZUP_CLIENT_KEY: ${ZUP_CLIENT_KEY:-}
       ZUP_ALLOW_INSECURE_HTTP: ${ZUP_ALLOW_INSECURE_HTTP:-false}
+      DOCUMENTOLOG_MODE: ${DOCUMENTOLOG_MODE:-mock}
+      DOCUMENTOLOG_BASE_URL: ${DOCUMENTOLOG_DOCKER_BASE_URL:-http://documentolog-mock:8400}
+      DOCUMENTOLOG_BROWSER_URL: ${DOCUMENTOLOG_BROWSER_URL:-http://localhost:${DOCUMENTOLOG_PORT:-8400}}
+      DOCUMENTOLOG_API_KEY: ${DOCUMENTOLOG_API_KEY:-${JWT_SECRET:?Set JWT_SECRET in .env}}
+      DOCUMENTOLOG_SENDER: ${DOCUMENTOLOG_SENDER:-}
+      DOCUMENTOLOG_PUBLIC_URL: ${DOCUMENTOLOG_PUBLIC_URL:-http://backend:8000}
+      DOCUMENTOLOG_CALLBACK_URL: ${DOCUMENTOLOG_CALLBACK_URL:-http://backend:8000}
     command: ["sh", "-c", "alembic upgrade head && if [ \"$${ZUP_MODE:-mock}\" = mock ]; then python -m app.seed; else echo 'ZUP_MODE=real: demo seed skipped'; fi"]
     depends_on:
       postgres:
@@ -57,11 +83,15 @@ services:
     restart: unless-stopped
     init: true
     environment: *backend_env
+    # File/webhook capability URLs must not appear in access logs.
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
     depends_on:
       migrate:
         condition: service_completed_successfully
+      documentolog-mock:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 10s
@@ -100,3 +130,4 @@ services:
 volumes:
   postgres_data:
   zup_mock_data:
+  documentolog_mock_data:
