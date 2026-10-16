@@ -1,4 +1,19 @@
 services:
+  zup-mock:
+    build: ./backend
+    restart: unless-stopped
+    init: true
+    environment:
+      ZUP_API_TOKEN: ${ZUP_API_TOKEN:-${JWT_SECRET:?Set JWT_SECRET in .env}}
+      ZUP_MOCK_DATABASE: /app/zup-data/zup.sqlite3
+    command: ["uvicorn", "app.mock_zup:app_factory", "--factory", "--host", "0.0.0.0", "--port", "8300"]
+    volumes:
+      - zup_mock_data:/app/zup-data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8300/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped
@@ -19,9 +34,23 @@ services:
       DATABASE_URL: postgresql+psycopg://jana:${POSTGRES_PASSWORD}@postgres:5432/jana
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       DEMO_PASSWORD: ${DEMO_PASSWORD:?Set DEMO_PASSWORD in .env}
-    command: ["sh", "-c", "alembic upgrade head && python -m app.seed"]
+      ZUP_MODE: ${ZUP_MODE:-mock}
+      ZUP_BASE_URL: ${ZUP_DOCKER_BASE_URL:-http://zup-mock:8300/hs/jana/v1}
+      ZUP_AUTH_TYPE: ${ZUP_AUTH_TYPE:-bearer}
+      ZUP_API_TOKEN: ${ZUP_API_TOKEN:-${JWT_SECRET:?Set JWT_SECRET in .env}}
+      ZUP_USERNAME: ${ZUP_USERNAME:-}
+      ZUP_PASSWORD: ${ZUP_PASSWORD:-}
+      ZUP_TIMEOUT_SECONDS: ${ZUP_TIMEOUT_SECONDS:-5}
+      ZUP_VERIFY_TLS: ${ZUP_VERIFY_TLS:-true}
+      ZUP_CA_BUNDLE: ${ZUP_CA_BUNDLE:-}
+      ZUP_CLIENT_CERT: ${ZUP_CLIENT_CERT:-}
+      ZUP_CLIENT_KEY: ${ZUP_CLIENT_KEY:-}
+      ZUP_ALLOW_INSECURE_HTTP: ${ZUP_ALLOW_INSECURE_HTTP:-false}
+    command: ["sh", "-c", "alembic upgrade head && if [ \"$${ZUP_MODE:-mock}\" = mock ]; then python -m app.seed; else echo 'ZUP_MODE=real: demo seed skipped'; fi"]
     depends_on:
       postgres:
+        condition: service_healthy
+      zup-mock:
         condition: service_healthy
   backend:
     build: ./backend
@@ -59,5 +88,15 @@ services:
       timeout: 5s
       retries: 10
       start_period: 15s
+  zup-worker:
+    build: ./backend
+    restart: unless-stopped
+    init: true
+    environment: *backend_env
+    command: ["python", "-m", "app.zup_worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 volumes:
   postgres_data:
+  zup_mock_data:

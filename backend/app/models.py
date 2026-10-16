@@ -24,6 +24,7 @@ class Employee(Base):
     manager_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"))
     hire_date: Mapped[date] = mapped_column(Date)
     leave_balance: Mapped[int] = mapped_column(Integer)
+    zup_id: Mapped[str | None] = mapped_column(String(100), unique=True)
     manager: Mapped["Employee | None"] = relationship(remote_side=[id])
 
     @property
@@ -36,7 +37,7 @@ class LeaveRequest(Base):
     __table_args__ = (
         UniqueConstraint("employee_id", "idempotency_key", name="uq_request_idempotency"),
         CheckConstraint("end_date >= start_date", name="ck_request_dates"),
-        CheckConstraint("status IN ('submitted','approved','rejected')", name="ck_request_status"),
+        CheckConstraint("status IN ('submitted','manager_approved','approved','rejected')", name="ck_request_status"),
     )
     id: Mapped[int] = mapped_column(primary_key=True)
     employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id"), index=True)
@@ -48,6 +49,23 @@ class LeaveRequest(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     idempotency_key: Mapped[str] = mapped_column(String(128))
     payload_hash: Mapped[str] = mapped_column(String(64))
+    days_count: Mapped[int] = mapped_column(Integer, default=0)
+    excluded_dates_json: Mapped[str] = mapped_column(Text, default="[]")
+    calendar_version: Mapped[str] = mapped_column(String(80), default="legacy-unquoted")
+
+
+class LeaveDeduction(Base):
+    __tablename__ = "leave_deductions"
+    __table_args__ = (
+        UniqueConstraint("request_id", name="uq_leave_deduction_request"),
+        CheckConstraint("days > 0", name="ck_leave_deduction_days"),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    request_id: Mapped[int] = mapped_column(ForeignKey("leave_requests.id"))
+    employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id"), index=True)
+    actor_id: Mapped[int] = mapped_column(ForeignKey("employees.id"))
+    days: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class RequestHistory(Base):
@@ -58,6 +76,20 @@ class RequestHistory(Base):
     status: Mapped[str] = mapped_column(String(20))
     comment: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ZupDelivery(Base):
+    __tablename__ = "zup_deliveries"
+    __table_args__ = (CheckConstraint("status IN ('pending','synced','error')", name="ck_zup_delivery_status"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    request_id: Mapped[int] = mapped_column(ForeignKey("leave_requests.id"), unique=True)
+    command_key: Mapped[str] = mapped_column(String(128), unique=True)
+    payload_json: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    reference: Mapped[str | None] = mapped_column(String(100))
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    last_error: Mapped[str | None] = mapped_column(String(500))
+    next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class Notification(Base):

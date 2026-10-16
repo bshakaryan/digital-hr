@@ -17,6 +17,8 @@ jobs:
         run: ./scripts/docker-up.sh
       - name: Backend regression tests (isolated SQLite)
         run: docker compose exec -T backend python -m pytest -q
+      - name: Leave integration and concurrency (isolated PostgreSQL schemas)
+        run: docker compose exec -T -e POSTGRES_TEST=1 backend python -m pytest -q tests/test_zup.py tests/test_requests.py tests/test_persistence.py
       - name: Smoke test through frontend and PostgreSQL persistence
         run: docker compose exec -T backend python - < scripts/compose_smoke.py
       - name: Restart with the existing database

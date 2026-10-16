@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Employee
 from app.modules.audit import record
+from app.modules.leave_balance import present_profile
 from app.schemas import Login, Profile, Token
 from app.security import current_user, issue_token, password_hash
 
@@ -25,5 +26,5 @@ def login(data: Login, db: Session = Depends(get_db)):
 
 
 @router.get("/me", response_model=Profile)
-def me(user: Employee = Depends(current_user)):
-    return user
+def me(user: Employee = Depends(current_user), db: Session = Depends(get_db)):
+    return present_profile(db, user)

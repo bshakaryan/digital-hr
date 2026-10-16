@@ -10,10 +10,10 @@ export interface Profile {
   manager_name: string | null;
   hire_date: string;
   leave_balance: number;
-  data_source: "mock_zup";
+  data_source: "mock_zup" | "zup";
 }
 
-export type RequestStatus = "submitted" | "approved" | "rejected";
+export type RequestStatus = "submitted" | "manager_approved" | "approved" | "rejected";
 export interface LeaveRequest {
   id: number;
   employee_id: number;
@@ -21,6 +21,11 @@ export interface LeaveRequest {
   type: "leave";
   start_date: string;
   end_date: string;
+  days_count: number;
+  excluded_dates: string[];
+  calendar_version: string;
+  zup_sync_status: "not_required" | "pending" | "synced" | "error" | "legacy";
+  zup_reference: string | null;
   comment: string;
   status: RequestStatus;
   version: number;
@@ -28,6 +33,11 @@ export interface LeaveRequest {
   history: { status: RequestStatus; actor_name: string; comment: string; created_at: string }[];
 }
 export interface RequestDraft { start_date: string; end_date: string; comment: string }
+export interface LeaveCalculation {
+  start_date: string; end_date: string; days_count: number; calendar_days: number;
+  excluded_dates: string[]; calendar_version: string; available_balance: number;
+  balance_after: number; sufficient_balance: boolean; source: "mock_zup_http" | "zup_http";
+}
 export interface Notification {
   id: number; kind: string; title: string; body: string; read: boolean; created_at: string;
 }
@@ -104,7 +114,7 @@ export class ApiClient {
 
 export const errorMessage = (error: unknown) => error instanceof Error ? error.message : "Произошла ошибка. Попробуйте ещё раз.";
 export const roleLabel: Record<Profile["role"], string> = { employee: "Сотрудник", manager: "Руководитель", hr_admin: "HR-администратор" };
-export const statusLabel: Record<RequestStatus, string> = { submitted: "На согласовании", approved: "Согласовано", rejected: "Отклонено" };
+export const statusLabel: Record<RequestStatus, string> = { submitted: "У руководителя", manager_approved: "На проверке HR", approved: "Согласовано", rejected: "Отклонено" };
 export const date = (value: string, full = false) => new Intl.DateTimeFormat("ru-RU", {
   day: "numeric", month: full ? "long" : "short", year: "numeric", timeZone: "UTC",
 }).format(new Date(value.length === 10 ? `${value}T00:00:00Z` : value));

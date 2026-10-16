@@ -33,7 +33,7 @@ class Profile(BaseModel):
     manager_name: str | None
     hire_date: date
     leave_balance: int
-    data_source: Literal["mock_zup"] = "mock_zup"
+    data_source: Literal["mock_zup", "zup"] = "mock_zup"
 
 
 class RequestCreate(Input):
@@ -54,8 +54,21 @@ class RequestDecision(Input):
     comment: str = Field(default="", max_length=2000)
 
 
+class LeaveCalculation(BaseModel):
+    start_date: date
+    end_date: date
+    days_count: int
+    calendar_days: int
+    excluded_dates: list[date]
+    calendar_version: str
+    available_balance: int
+    balance_after: int
+    sufficient_balance: bool
+    source: Literal["mock_zup_http", "zup_http"] = "mock_zup_http"
+
+
 class HistoryOut(BaseModel):
-    status: str
+    status: Literal["submitted", "manager_approved", "approved", "rejected"]
     actor_name: str
     comment: str
     created_at: UTCDateTime
@@ -68,8 +81,13 @@ class RequestOut(BaseModel):
     type: Literal["leave"] = "leave"
     start_date: date
     end_date: date
+    days_count: int
+    excluded_dates: list[date]
+    calendar_version: str
+    zup_sync_status: Literal["not_required", "pending", "synced", "error", "legacy"]
+    zup_reference: str | None
     comment: str
-    status: str
+    status: Literal["submitted", "manager_approved", "approved", "rejected"]
     version: int
     created_at: UTCDateTime
     history: list[HistoryOut]
