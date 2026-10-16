@@ -14,6 +14,7 @@ const actions: Record<string, string> = {
   "request.cancelled": "Отмена подтверждена", "request.cancellation_rejected": "Отмена отклонена",
   "leave.deducted": "Учёт дней", "zup.leave_registered": "Передача в 1С",
   "zup.leave_cancelled": "Возврат дней", "notification.read": "Прочтение уведомления",
+  "notification.cleared": "Очистка прочитанного уведомления",
   "course.assigned": "Назначение курса", "course.progressed": "Прогресс курса", "course.completed": "Завершение курса",
   "documentolog.prepared": "Подготовка документа", "documentolog.creation_started": "Отправка документа",
   "documentolog.session_created": "Сессия подписания", "documentolog.needs_review": "Сверка документа",

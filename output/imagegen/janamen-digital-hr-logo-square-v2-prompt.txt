@@ -1,0 +1,5 @@
+Mode: built-in image_gen
+Reference: output/imagegen/janamen-digital-hr-logo-v1.png
+Transparent background: false
+
+Use case: logo-brand. Edit the reference logo into a SQUARE 1:1 logo canvas. Preserve saturated green background, pure white typography, heavy geometric sans-serif style and the small diagonal white accent. Replace all main text with exact UPPERCASE lettering. Composition: three centered stacked lines: first line 'JANA' in Latin uppercase J A N A; second line 'МЕН' in Cyrillic uppercase М Е Н; third line 'DIGITAL HR' in Latin uppercase, smaller. JANA and МЕН should be bold, large, visually balanced with equal block widths and tight professional spacing; DIGITAL HR forms a clean smaller caption below. Keep comfortable equal outer margins in the square, cohesive compact logo composition, a small diagonal white accent above the N of JANA. Exact visible words only: JANA МЕН DIGITAL HR. No lowercase, no concatenated JanaМен, no POST, no extra text. Flat clean solid green and white design with sharp vector-like edges, no shadows, no gradients, no textures, no mockup. Output must be a square image with identical width and height.

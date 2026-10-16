@@ -22,6 +22,7 @@ ACTION_LABELS = {
     "request.cancelled": "HR подтвердил отмену", "request.cancellation_rejected": "HR отклонил отмену",
     "leave.deducted": "Учтены дни отпуска", "zup.leave_registered": "Отпуск передан в 1С",
     "zup.leave_cancelled": "Возврат дней подтверждён 1С", "notification.read": "Уведомление прочитано",
+    "notification.cleared": "Прочитанное уведомление убрано из списка",
     "course.assigned": "Назначен курс", "course.progressed": "Обновлён прогресс курса", "course.completed": "Завершён курс",
     "documentolog.prepared": "Подготовлен документ", "documentolog.creation_started": "Начата отправка документа",
     "documentolog.session_created": "Создана сессия подписания", "documentolog.needs_review": "Документ требует сверки",

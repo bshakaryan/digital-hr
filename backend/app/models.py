@@ -150,6 +150,7 @@ class Notification(Base):
     title: Mapped[str] = mapped_column(String(200))
     body: Mapped[str] = mapped_column(Text)
     read: Mapped[bool] = mapped_column(Boolean, default=False)
+    cleared_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     entity_type: Mapped[str | None] = mapped_column(String(30))
     entity_id: Mapped[int | None] = mapped_column(Integer)

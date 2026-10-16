@@ -24,14 +24,15 @@ async function login(actor) {
   await page.getByLabel("Пароль", { exact: true }).fill(password);
   const response = page.waitForResponse(response => response.url().endsWith("/api/auth/login"));
   await page.getByRole("button", { name: "Войти в JanaМен" }).click();
-  await page.getByRole("navigation").waitFor();
+  await page.getByRole("button", { name: "JanaМен — главная", exact: true }).waitFor();
   return { Authorization: `Bearer ${(await (await response).json()).access_token}` };
 }
 async function logout() { await page.getByRole("button", { name: "Выйти из аккаунта" }).click(); await page.getByRole("heading", { name: "Добро пожаловать" }).waitFor(); }
 async function tab(name) {
+  if (name === "Уведомления") { await page.getByRole("button", { name: /^Уведомления/ }).first().click(); return; }
   if (await page.getByRole("button", { name: "Открыть меню", exact: true }).isVisible()) await page.getByRole("button", { name: "Открыть меню", exact: true }).click();
   await page.getByRole("navigation").getByRole("button", { name: new RegExp(`^${name}`) }).click();
-  await page.waitForFunction(() => innerWidth > 780 || document.querySelector(".sidebar").getBoundingClientRect().right <= 1);
+  await page.waitForFunction(() => document.querySelector(".menu-button")?.getAttribute("aria-expanded") === "false");
 }
 async function detail(id) { const element = page.getByRole("dialog", { name: `Заявка №${id}`, exact: true }); await element.getByText("История заявки", { exact: true }).waitFor(); return element; }
 async function close(id) { await (await detail(id)).getByRole("button", { name: "Закрыть", exact: true }).click(); }

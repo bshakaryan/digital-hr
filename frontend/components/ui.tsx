@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, type ReactNode } from "react";
+import Image from "next/image";
 import { statusLabel, type RequestStatus } from "@/lib/api";
 
 const paths = {
@@ -19,6 +20,7 @@ const paths = {
   clock: "M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0ZM12 6v6l4 2",
   chevron: "m9 5 7 7-7 7",
   menu: "M4 6h16M4 12h16M4 18h16",
+  globe: "M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0ZM2 12h20M12 2a19 19 0 0 1 0 20 19 19 0 0 1 0-20Z",
   shield: "m12 2 8 4v6c0 5-8 10-8 10S4 17 4 12V6ZM8 12l3 3 5-6",
   people: "M16 21v-2a6 6 0 0 0-12 0v2M14 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM20 21v-2a6 6 0 0 0-3-5M17 3a4 4 0 0 1 0 8",
   refresh: "M20 7a9 9 0 1 0 1 9M20 2v6h-6",
@@ -32,8 +34,8 @@ export type IconName = keyof typeof paths;
 export function Icon({ name, size = 20, className = "" }: { name: IconName; size?: number; className?: string }) {
   return <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name]} /></svg>;
 }
-export function Brand({ light = false }: { light?: boolean }) {
-  return <div className={`brand ${light ? "brand-light" : ""}`}><span className="brand-symbol">j<span>↗</span></span><span>Jana<span className="brand-men">Мен</span><small>DIGITAL HR</small></span></div>;
+export function Brand() {
+  return <div className="brand"><Image className="brand-image" src="/brand/jana-digital-wordmark.png" alt="Jańa Digital" width={1833} height={858} sizes="(max-width: 640px) 190px, 242px" priority /></div>;
 }
 export function Status({ value }: { value: RequestStatus }) {
   return <span className={`status status-${value}`}><span />{statusLabel[value]}</span>;

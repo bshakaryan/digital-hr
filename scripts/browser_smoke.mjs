@@ -35,6 +35,7 @@ async function logout(page) {
   await page.getByRole("heading", { name: "Добро пожаловать" }).waitFor();
 }
 async function tab(page, name) {
+  if (name === "Уведомления") { await page.getByRole("button", { name: /^Уведомления/ }).first().click(); return; }
   await page.getByRole("navigation").getByRole("button", { name: new RegExp("^" + name) }).click();
 }
 function watch(page) {

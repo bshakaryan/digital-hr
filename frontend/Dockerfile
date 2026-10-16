@@ -20,6 +20,7 @@ ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
 RUN addgroup --system --gid 1001 jana && adduser --system --uid 1001 --ingroup jana jana
 COPY --from=build --chown=jana:jana /app/.next/standalone ./
 COPY --from=build --chown=jana:jana /app/.next/static ./.next/static
+COPY --from=build --chown=jana:jana /app/public ./public
 USER jana
 EXPOSE 3000
 CMD ["node", "server.js"]

@@ -3,7 +3,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Employee, Notification
+from app.models import Employee, Notification, utcnow
 from app.modules.audit import record
 from app.schemas import NotificationOut
 from app.security import current_user
@@ -23,14 +23,25 @@ def present(db, item):
 
 @router.get("", response_model=list[NotificationOut])
 def notifications(user: Employee = Depends(current_user), db: Session = Depends(get_db)):
-    return [present(db, item) for item in db.scalars(select(Notification).where(Notification.employee_id == user.id).order_by(Notification.id.desc())).all()]
+    return [present(db, item) for item in db.scalars(select(Notification).where(Notification.employee_id == user.id, Notification.cleared_at.is_(None)).order_by(Notification.id.desc())).all()]
 
 
 @router.patch("/read-all")
 def mark_all_read(user: Employee = Depends(current_user), db: Session = Depends(get_db)):
-    ids = db.scalars(update(Notification).where(Notification.employee_id == user.id, Notification.read.is_(False)).values(read=True).returning(Notification.id)).all()
+    ids = db.scalars(update(Notification).where(Notification.employee_id == user.id, Notification.read.is_(False), Notification.cleared_at.is_(None)).values(read=True).returning(Notification.id)).all()
     for notification_id in ids:
         record(db, user.id, "notification.read", "notification", notification_id)
+    db.commit()
+    return {"updated": len(ids)}
+
+
+@router.patch("/clear-read")
+def clear_read(user: Employee = Depends(current_user), db: Session = Depends(get_db)):
+    ids = db.scalars(update(Notification).where(
+        Notification.employee_id == user.id, Notification.read.is_(True), Notification.cleared_at.is_(None)
+    ).values(cleared_at=utcnow()).returning(Notification.id)).all()
+    for notification_id in ids:
+        record(db, user.id, "notification.cleared", "notification", notification_id)
     db.commit()
     return {"updated": len(ids)}
 

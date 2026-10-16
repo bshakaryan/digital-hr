@@ -46,17 +46,17 @@ function Login({ onLogin, message }: { onLogin: (session: Session) => void; mess
     finally { busy.current = false; setPending(false); }
   }
   return <main className="login-page">
+    <header className="login-header"><a className="brand-home" href="/" aria-label="JanaМен — главная"><Brand /></a><span className="login-header-label">Люди. Возможности. Jana.</span><span className="tag"><span className="live-dot" /> Демо-пространство</span></header>
+    <div className="login-layout">
     <section className="login-story">
-      <Brand light />
-      <div className="login-story-main"><span className="eyebrow light-eyebrow"><span className="live-dot" /> ЛЮДИ. ВОЗМОЖНОСТИ. JANA.</span><h1>Всё для работы.<br /><span>Больше для вас.</span></h1><p>Личное пространство сотрудника:<br />меньше рутины, больше движения вперёд.</p><div className="login-art" aria-hidden="true"><div className="orbit orbit-one" /><div className="orbit orbit-two" /><div className="orbit orbit-three" /><div className="art-center"><Icon name="leaf" size={56} /></div><span className="art-chip chip-one"><Icon name="check" size={17} /> Быть в команде</span><span className="art-chip chip-two"><Icon name="spark" size={17} /> Расти каждый день</span><span className="art-dot dot-one" /><span className="art-dot dot-two" /></div></div>
-      <div className="login-story-footer"><span>Jana Post · Digital HR</span><span>С заботой о людях ↗</span></div>
+      <div className="login-story-main"><span className="eyebrow">С ЗАБОТОЙ О КОМАНДЕ</span><h1>Всё для работы.<br /><span>Больше для вас.</span></h1><p>Ваши возможности — в одном пространстве.<br />Планируйте отдых, учитесь и двигайтесь вперёд.</p><div className="login-features"><div><Icon name="user" size={27} /><strong>Ваш профиль</strong><span>Важное под рукой</span></div><div><Icon name="calendar" size={27} /><strong>Ваш отдых</strong><span>Заявки без рутины</span></div><div><Icon name="book" size={27} /><strong>Ваше развитие</strong><span>Новые знания рядом</span></div></div></div>
     </section>
-    <section className="login-form-side"><div className="login-mobile-brand"><Brand /></div><div className="login-form-wrap"><span className="eyebrow">РАБОЧИЙ ДЕНЬ НАЧИНАЕТСЯ ЗДЕСЬ</span><h2>Добро пожаловать</h2><p className="muted">Войдите в своё пространство JanaМен.</p>
+    <section className="login-form-side"><div className="login-form-wrap"><span className="eyebrow">ВАШЕ ЛИЧНОЕ ПРОСТРАНСТВО</span><h2>Добро пожаловать</h2><p className="muted">Войдите в своё пространство JanaМен.</p>
       {message && <div className="notice"><Icon name="info" />{message}</div>}
       <form onSubmit={submit} className="login-form"><label htmlFor="email">Рабочая почта</label><div className="input-with-icon"><Icon name="mail" /><input id="email" type="email" autoComplete="username" placeholder="name@example.com" value={email} onChange={(event) => setEmail(event.target.value)} required disabled={pending} /></div><label htmlFor="password">Пароль</label><div className="input-with-icon"><Icon name="shield" /><input id="password" type={visible ? "text" : "password"} autoComplete="current-password" placeholder="Введите пароль" value={password} onChange={(event) => setPassword(event.target.value)} required disabled={pending} /><button type="button" className="password-toggle" onClick={() => setVisible(!visible)} aria-label={visible ? "Скрыть пароль" : "Показать пароль"} aria-pressed={visible}><Icon name="eye" size={18} /></button></div>
         {error && <ErrorBox message={error} />}<button className="button button-primary login-submit" disabled={pending}>{pending ? <><span className="spinner" /> Входим…</> : <>Войти в JanaМен <Icon name="arrow" size={18} /></>}</button>
       </form>
       <div className="demo-accounts"><span className="small-label">ДЕМО-ДОСТУП</span><p>Выберите роль и введите настроенный демо-пароль.</p><div>{demoAccounts.map(([label, address]) => <button key={address} className={email === address ? "demo-choice selected" : "demo-choice"} onClick={() => setEmail(address)} disabled={pending}>{label}</button>)}</div><small>Демо-профили вымышлены. Пароль задаётся при запуске сервера.</small></div>
-    </div><div className="login-footer"><Icon name="shield" size={15} /> После обновления страницы потребуется войти снова</div></section>
+    </div><div className="login-footer"><Icon name="shield" size={15} /> После обновления страницы потребуется войти снова</div></section></div>
   </main>;
 }

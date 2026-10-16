@@ -55,6 +55,8 @@ def test_bad_password_and_unknown_account_are_indistinguishable_and_do_not_write
         ("PATCH", "/api/requests/1/status", {"status": "approved", "version": 1}),
         ("GET", "/api/notifications", None),
         ("PATCH", "/api/notifications/1/read", None),
+        ("PATCH", "/api/notifications/read-all", None),
+        ("PATCH", "/api/notifications/clear-read", None),
         ("GET", "/api/courses", None),
         ("GET", "/api/courses/1", None),
         ("POST", "/api/courses/1/progress", {"progress": 100}),
