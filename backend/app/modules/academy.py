@@ -1,14 +1,16 @@
 import json
+from types import SimpleNamespace
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Course, CourseAssignment, Employee
+from app.modules.assistant import answer_from_documents
 from app.modules.audit import record
 from app.modules.notifications import notify
-from app.schemas import Completion, CourseOut, Progress
+from app.schemas import AssistantOut, Completion, CourseOut, Progress, Question, RewardsOut
 from app.security import current_user
 
 router = APIRouter(prefix="/courses", tags=["academy"])
@@ -31,6 +33,17 @@ def courses(user: Employee = Depends(current_user), db: Session = Depends(get_db
     return [present(c, a) for c, a in pairs]
 
 
+@router.get("/rewards", response_model=RewardsOut)
+def rewards(user: Employee = Depends(current_user), db: Session = Depends(get_db)):
+    # Completed assignments are the single source of truth: one unique assignment
+    # per employee/course means retries cannot award XP again.
+    completed = db.scalar(select(func.count()).select_from(CourseAssignment).where(
+        CourseAssignment.employee_id == user.id, CourseAssignment.completed.is_(True))) or 0
+    xp = completed * 100
+    return RewardsOut(xp=xp, level=1 + xp // 100, next_level_xp=(1 + xp // 100) * 100,
+                      badges=(["Первый курс"] if completed >= 1 else []) + (["Три курса"] if completed >= 3 else []))
+
+
 @router.get("/{course_id}", response_model=CourseOut)
 def course(course_id: int, user: Employee = Depends(current_user), db: Session = Depends(get_db)):
     return present(*assigned(db, user.id, course_id))
@@ -39,7 +52,8 @@ def course(course_id: int, user: Employee = Depends(current_user), db: Session =
 @router.post("/{course_id}/progress", response_model=CourseOut)
 def progress(course_id: int, data: Progress, user: Employee = Depends(current_user), db: Session = Depends(get_db)):
     c, a = assigned(db, user.id, course_id)
-    changed = db.execute(update(CourseAssignment).where(CourseAssignment.id == a.id, CourseAssignment.progress < data.progress).values(progress=data.progress).execution_options(synchronize_session=False))
+    saved_progress = min(data.progress, 99)  # 100 is reserved for verified quiz completion.
+    changed = db.execute(update(CourseAssignment).where(CourseAssignment.id == a.id, CourseAssignment.progress < saved_progress).values(progress=saved_progress).execution_options(synchronize_session=False))
     if changed.rowcount:
         record(db, user.id, "course.progressed", "course", course_id)
     db.commit()
@@ -50,6 +64,8 @@ def progress(course_id: int, data: Progress, user: Employee = Depends(current_us
 @router.post("/{course_id}/complete", response_model=CourseOut)
 def complete(course_id: int, data: Completion, user: Employee = Depends(current_user), db: Session = Depends(get_db)):
     c, a = assigned(db, user.id, course_id)
+    if not a.completed and a.progress < 70:
+        raise HTTPException(409, "Сначала отметьте изучение материала")
     if data.answer_index != c.correct_index:
         raise HTTPException(422, "Ответ неверный. Прочитайте материал и попробуйте ещё раз")
     changed = db.execute(update(CourseAssignment).where(CourseAssignment.id == a.id, CourseAssignment.completed.is_(False)).values(progress=100, completed=True).execution_options(synchronize_session=False))
@@ -59,3 +75,11 @@ def complete(course_id: int, data: Completion, user: Employee = Depends(current_
     db.commit()
     db.refresh(a)
     return present(c, a)
+
+
+@router.post("/{course_id}/ask", response_model=AssistantOut)
+def ask_course(course_id: int, data: Question, user: Employee = Depends(current_user), db: Session = Depends(get_db)):
+    course, _ = assigned(db, user.id, course_id)
+    material = SimpleNamespace(id=course.id, title=course.title, section="Материал курса",
+                               keywords=course.title, content=course.content)
+    return answer_from_documents(data.question, [material], source_type="course", min_score=0.25)

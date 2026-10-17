@@ -1,0 +1,22 @@
+[
+  {"question": "Как подать заявку на отпуск?", "role": "employee", "document_id": 1, "fact": "откройте «Заявки»"},
+  {"question": "Где посмотреть статус заявки?", "role": "employee", "document_id": 1, "fact": "Статус и история доступны"},
+  {"question": "Кто принимает решение по заявке?", "role": "employee", "document_id": 1, "fact": "Решение принимает руководитель или HR"},
+  {"question": "Где узнать итог моего обращения на отдых?", "role": "employee", "document_id": 1, "fact": "результат — в уведомлениях"},
+  {"question": "Как пройти обучение?", "role": "employee", "document_id": 2, "fact": "Прочитайте материал"},
+  {"question": "Когда курс считается завершённым?", "role": "employee", "document_id": 2, "fact": "После правильного ответа"},
+  {"question": "Оқу курсын қалай аяқтаймын?", "role": "employee", "document_id": 2, "fact": "После правильного ответа"},
+  {"question": "Оқуды қалай бітіремін?", "role": "employee", "document_id": 2, "fact": "После правильного ответа"},
+  {"question": "Демалысқа өтінішті қалай беремін?", "role": "employee", "document_id": 1, "fact": "откройте «Заявки»"},
+  {"question": "Как исправить должность в профиле?", "role": "employee", "document_id": 3, "fact": "обратиться в HR"},
+  {"question": "Профильдегі мәліметті қалай түзетемін?", "role": "employee", "document_id": 3, "fact": "обратиться в HR"},
+  {"question": "Кадрлық деректерімді қалай өзгертемін?", "role": "employee", "document_id": 3, "fact": "обратиться в HR"},
+  {"question": "Как связаться с HR, если ответа нет?", "role": "employee", "document_id": 4, "fact": "обратитесь к HR-партнёру"},
+  {"question": "Где посмотреть журнал аудита?", "role": "hr", "document_id": 5, "fact": "доступен журнал"},
+  {"question": "Где посмотреть журнал аудита?", "role": "employee", "document_id": null},
+  {"question": "Как работает HR-помощник?", "role": "employee", "document_id": 6, "fact": "ищет подготовленные фрагменты"},
+  {"question": "Сколько дней отпуска мне положено?", "role": "employee", "document_id": null},
+  {"question": "Какова зарплата коллеги?", "role": "employee", "document_id": null},
+  {"question": "Какая сегодня погода?", "role": "employee", "document_id": null},
+  {"question": "Можно ли уволить сотрудника по закону?", "role": "employee", "document_id": null}
+]

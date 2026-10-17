@@ -11,7 +11,9 @@ def test_progress_is_monotone_but_100_requires_quiz_and_completion_is_idempotent
     assert "correct_index" not in course
     assert course["completed"] is False
     course_id = course["id"]
-    for submitted, expected in ((60, 60), (10, 60), (60, 60), (100, 100), (0, 100)):
+    assert api.get("/api/courses/rewards").json() == {"xp": 0, "level": 1, "next_level_xp": 100, "badges": []}
+    assert api.post(f"/api/courses/{course_id}/complete", {"answer_index": 0}).status_code == 409
+    for submitted, expected in ((60, 60), (10, 60), (60, 60), (100, 99), (0, 99)):
         response = api.post(f"/api/courses/{course_id}/progress", {"progress": submitted})
         assert response.status_code == 200
         assert response.json()["progress"] == expected
@@ -26,14 +28,17 @@ def test_progress_is_monotone_but_100_requires_quiz_and_completion_is_idempotent
     assert completed.status_code == 200
     assert completed.json()["completed"] is True
     assert completed.json()["progress"] == 100
+    assert api.get("/api/courses/rewards").json() == {"xp": 100, "level": 2, "next_level_xp": 200, "badges": ["Первый курс"]}
     after = api.db.snapshot()
     assert len(after["notifications"]) == len(before["notifications"]) + 1
     assert len(after["audit_events"]) == len(before["audit_events"]) + 1
     assert api.post(f"/api/courses/{course_id}/complete", {"answer_index": right}).json() == completed.json()
     assert api.post(f"/api/courses/{course_id}/progress", {"progress": 1}).json() == completed.json()
     assert api.db.snapshot() == after
+    assert api.get("/api/courses/rewards").json()["xp"] == 100
     other = api.get(f"/api/courses/{course_id}", "outsider").json()
     assert (other["progress"], other["completed"]) == (0, False)
+    assert api.get("/api/courses/rewards", "outsider").json()["xp"] == 0
 
 
 @pytest.mark.parametrize("progress", [-1, 101, True, "50", 1.5])
@@ -78,7 +83,9 @@ def test_assistant_answer_is_grounded_in_a_readable_source(api):
         document = api.get(f"/api/knowledge/{source['document_id']}")
         assert document.status_code == 200
         assert document.json() == source
-        assert source["content"] in answer["answer"]
+        assert answer["answer"].endswith("[1]")
+        quoted = answer["answer"].removeprefix("По демонстрационной базе: ").removesuffix(" [1]")
+        assert all(sentence.strip() in source["content"] for sentence in quoted.split(". ") if sentence.strip())
 
 
 @pytest.mark.parametrize(
@@ -121,4 +128,35 @@ def test_hr_private_knowledge_is_filtered_before_retrieval(api):
     assert source.status_code == 200
     answer = api.post("/api/assistant/query", {"question": "аудит журнал"}, "hr").json()
     assert source.json() in answer["sources"]
-    assert private_content in answer["answer"]
+    assert answer["answer"].removeprefix("По демонстрационной базе: ").removesuffix(" [1]").split(". ")[0] in private_content
+
+
+def test_course_assistant_uses_only_assigned_material(api):
+    course = api.get("/api/courses/1").json()
+    answer = api.post("/api/courses/1/ask", {"question": "Где увидеть решение по заявке?"})
+    assert answer.status_code == 200
+    result = answer.json()
+    assert result["sources"] == [{"document_id": 1, "title": course["title"],
+                                   "section": "Материал курса", "content": course["content"], "source_type": "course"}]
+    assert result["answer"].endswith("[1]")
+    refused = api.post("/api/courses/1/ask", {"question": "Какая сегодня погода?"}).json()
+    assert refused["sources"] == [] and refused["escalate_to_hr"]
+    unsupported = api.post("/api/courses/1/ask", {"question": "Какой срок курса?"}).json()
+    assert unsupported["sources"] == [] and unsupported["escalate_to_hr"]
+    from app.models import Course, CourseAssignment
+    with api.db.session() as db:
+        private = Course(title="Только HR", description="", content="Секретный материал о тесте",
+                         duration_minutes=5, question="Тест?", options_json='["Да", "Нет"]', correct_index=0)
+        db.add(private)
+        db.flush()
+        private_id = private.id
+        db.add(CourseAssignment(employee_id=3, course_id=private_id))
+        db.commit()
+    assert api.post(f"/api/courses/{private_id}/ask", {"question": "Что в секретном материале?"}).status_code == 404
+    assert api.post(f"/api/courses/{private_id}/ask", {"question": "Что в секретном материале?"}, "hr").status_code == 200
+
+
+def test_assistant_and_rewards_require_login(api):
+    assert api.client.post("/api/assistant/query", json={"question": "Как подать заявку?"}).status_code == 401
+    assert api.client.post("/api/courses/1/ask", json={"question": "Как подать заявку?"}).status_code == 401
+    assert api.client.get("/api/courses/rewards").status_code == 401

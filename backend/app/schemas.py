@@ -142,6 +142,13 @@ class CourseOut(BaseModel):
     options: list[str]
 
 
+class RewardsOut(BaseModel):
+    xp: int
+    level: int
+    next_level_xp: int
+    badges: list[str]
+
+
 class Progress(Input):
     progress: int = Field(ge=0, le=100, strict=True)
 
@@ -159,6 +166,7 @@ class Source(BaseModel):
     title: str
     section: str
     content: str
+    source_type: Literal["knowledge", "course"] = "knowledge"
 
 
 class AssistantOut(BaseModel):

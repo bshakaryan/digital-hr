@@ -109,6 +109,7 @@ def test_seed_rerun_preserves_completed_course_and_does_not_notify_again(api):
 
     with api.db.session() as db:
         right = db.get(Course, 1).correct_index
+    assert api.post("/api/courses/1/progress", {"progress": 70}).status_code == 200
     assert api.post("/api/courses/1/complete", {"answer_index": right}).status_code == 200
     before = api.db.snapshot()
     api.db.seed()
@@ -124,6 +125,7 @@ def test_alembic_upgrade_preserves_populated_database_and_check_has_no_drift(api
     assert api.decide(manager_approved, "hr").status_code == 200
     with api.db.session() as db:
         right = db.get(Course, 1).correct_index
+    assert api.post("/api/courses/1/progress", {"progress": 70}).status_code == 200
     assert api.post("/api/courses/1/complete", {"answer_index": right}).status_code == 200
     notification = api.get("/api/notifications").json()[0]
     assert api.patch(f"/api/notifications/{notification['id']}/read").status_code == 200

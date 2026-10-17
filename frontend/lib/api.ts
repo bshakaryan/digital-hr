@@ -53,6 +53,7 @@ export interface Course {
   id: number; title: string; description: string; content: string; duration_minutes: number;
   progress: number; completed: boolean; question: string; options: string[];
 }
+export interface AcademyRewards { xp: number; level: number; next_level_xp: number; badges: string[] }
 export interface Knowledge { document_id: number; title: string; section: string; content: string }
 export interface AssistantAnswer {
   answer: string; sources: Knowledge[]; escalate_to_hr: boolean; mode: "extractive_demo";

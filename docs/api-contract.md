@@ -66,17 +66,19 @@
 
 - GET /api/courses → назначенные текущему пользователю курсы.
 - GET /api/courses/{id} → назначенный курс.
-- POST /api/courses/{id}/progress — {progress:integer 0..100}; увеличивает прогресс, не отмечает завершение без теста.
-- POST /api/courses/{id}/complete — {answer_index:integer}; неверный ответ → 422. При успехе progress=100, completed=true. Повтор не создаёт второе уведомление.
+- POST /api/courses/{id}/progress — {progress:integer 0..100}; монотонно сохраняет не более 99. Значение 100 устанавливает только успешный тест.
+- POST /api/courses/{id}/complete — {answer_index:integer}; до сохранённого progress ≥70 → 409, неверный ответ → 422. При успехе progress=100, completed=true. Повтор не создаёт второе уведомление или XP.
+- GET /api/courses/rewards → {xp,level,next_level_xp,badges:string[]}; 100 XP за уникальный завершённый назначенный курс, уровень 1 + floor(xp/100). Достижения: первый и три курса. Состояние вычисляется на сервере из завершённых назначений.
+- POST /api/courses/{id}/ask — {question:string 3..1000} → ответ помощника только по материалу назначенного курса. Неназначенный курс → 404.
 
 Курс: {id,title,description,content:string,duration_minutes,progress,completed,question,options:string[]}.
 
 ## Помощник
 
-- POST /api/assistant/query — {question:string 3..1000} → {answer,sources:[{document_id,title,section,content}],escalate_to_hr:boolean,mode:"extractive_demo"}.
-- GET /api/knowledge/{id} → {document_id,title,section,content}; доступ только по области документа. Никаких персональных данных и инструментов записи у помощника нет.
+- POST /api/assistant/query — {question:string 3..1000} → {answer,sources:[{document_id,title,section,content,source_type:"knowledge"|"course"}],escalate_to_hr:boolean,mode:"extractive_demo"}. Общая база фильтруется по роли до поиска.
+- GET /api/knowledge/{id} → источник с source_type:"knowledge"; доступ только по области документа. Источник source_type:"course" из /courses/{id}/ask проверяется через назначенный GET /api/courses/{id}, где document_id означает id курса. Никаких персональных данных и инструментов записи у помощника нет.
 
-Демо-база описывает прототип, а не кадровые правила компании. Неизвестный вопрос → отказ и sources=[]. Источник открывается в UI по document_id. Внешний LLM не вызывается.
+Демо-база описывает прототип, а не кадровые правила компании. Неизвестный вопрос → отказ и sources=[]. Ответ собирается из предложений разрешённого источника с маркером [1]; source_type определяет, где проверить материал. Используется детерминированный гибридный поиск по заголовкам, ключевым словам и тексту с небольшим RU/KZ словарём. Внешний LLM не вызывается; генеративная модель и общий перевод на казахский не заявляются.
 
 ## Служебное
 
