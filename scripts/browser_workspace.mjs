@@ -80,7 +80,7 @@ try {
   await page.getByRole("button", { name: /^Требуют моего решения/ }).waitFor();
   await page.getByRole("row").filter({ hasText: `№${item.id} ·` }).getByRole("button", { name: "Рассмотреть" }).waitFor();
   await page.screenshot({ path: `${output}/review-queue.png`, fullPage: true, animations: "disabled" });
-  await tab("Календарь команды"); await page.getByLabel("Месяц").fill(free[1].slice(0, 7));
+  await tab("Календарь сотрудников"); await page.getByLabel("Месяц").fill(free[1].slice(0, 7));
   await page.getByRole("button", { name: new RegExp(`заявка №${item.id}$`) }).click();
   await close(item.id); await tab("Заявки");
   await page.getByRole("row").filter({ hasText: `№${item.id} ·` }).getByRole("button", { name: "Рассмотреть" }).click();
@@ -116,7 +116,7 @@ try {
   await page.screenshot({ path: `${output}/team-structure.png`, fullPage: true, animations: "disabled" });
   await tab("Интеграции и очереди"); await page.getByRole("heading", { name: "Интеграция 1С:ЗУП", exact: true }).waitFor();
   await page.setViewportSize({ width: 390, height: 844 });
-  await tab("Календарь команды"); await page.getByLabel("Месяц").fill(free[1].slice(0, 7));
+  await tab("Календарь сотрудников"); await page.getByLabel("Месяц").fill(free[1].slice(0, 7));
   assert.equal(await page.getByRole("button", { name: new RegExp(`заявка №${item.id}$`) }).count(), 0);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await page.screenshot({ path: `${output}/calendar-mobile.png`, fullPage: true, animations: "disabled" });

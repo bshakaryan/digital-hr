@@ -37,6 +37,28 @@ class Profile(BaseModel):
     data_source: Literal["mock_zup", "zup"] = "mock_zup"
 
 
+class CalendarEmployee(BaseModel):
+    id: int
+    full_name: str
+    department: str
+    can_open_profile: bool
+
+
+class CalendarAbsence(BaseModel):
+    id: int
+    employee_id: int
+    start_date: date
+    end_date: date
+    status: Literal["submitted", "manager_approved", "approved", "cancellation_requested"]
+    can_open_request: bool
+
+
+class EmployeeCalendar(BaseModel):
+    month: str
+    employees: list[CalendarEmployee]
+    absences: list[CalendarAbsence]
+
+
 class RequestCreate(Input):
     start_date: date
     end_date: date

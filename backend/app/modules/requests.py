@@ -231,8 +231,7 @@ def decide(request_id: int, data: RequestDecision, user: Employee = Depends(curr
     remaining_balance = None
     if next_status == "approved":
         # Every balance writer locks the employee row. This serializes approvals of
-        # different requests for one employee in PostgreSQL; SQLite tests cannot
-        # establish that locking guarantee.
+        # different requests for one employee in PostgreSQL.
         owner = db.scalar(select(Employee).where(Employee.id == item.employee_id).with_for_update())
         ensure_no_overlap(db, owner.id, item.start_date, item.end_date, excluding=item.id, statuses=("approved", "cancellation_requested"))
         quote, available = quote_leave(db, owner, item.start_date, item.end_date)

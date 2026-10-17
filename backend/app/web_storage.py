@@ -1,13 +1,17 @@
-"""Storage setup for the single-service Docker launcher, before dropping root."""
+"""Prepare only the mock SQLite stores before the Docker launcher drops root."""
 import os
 from pathlib import Path
 import sqlite3
 import tempfile
 
-from sqlalchemy.engine import URL, make_url
+from app.config import postgres_database_url
 
 
 def prepare_storage(env: dict[str, str], *, owner: tuple[int, int] | None = None):
+    try:
+        env["DATABASE_URL"] = postgres_database_url(env.get("DATABASE_URL", ""))
+    except ValueError as error:
+        raise RuntimeError(str(error)) from None
     data = Path(env.get("DATA_DIR") or "/var/data").expanduser().resolve()
     env["DATA_DIR"] = str(data)
     paths = []
@@ -46,14 +50,6 @@ def prepare_storage(env: dict[str, str], *, owner: tuple[int, int] | None = None
         return str(path)
 
     directory(data)
-    configured_url = env.get("DATABASE_URL")
-    url = make_url(configured_url) if configured_url else URL.create("sqlite", database=str(data / "jana.sqlite3"))
-    if url.get_backend_name() == "sqlite":
-        if not url.database or url.database == ":memory:" or url.database.startswith("file:") or url.query:
-            raise RuntimeError("Single-service deployment requires an ordinary SQLite file URL, e.g. sqlite:////var/data/jana.sqlite3")
-        env["DATABASE_URL"] = url.set(database=database_path(url.database)).render_as_string(hide_password=False)
-    else:
-        env["DATABASE_URL"] = configured_url
     for key, name in (("ZUP_MOCK_DATABASE", "zup.sqlite3"), ("DOCUMENTOLOG_MOCK_DATABASE", "documentolog.sqlite3")):
         env[key] = database_path(env.get(key) or str(data / name))
     return paths
@@ -70,4 +66,4 @@ def verify_storage(paths):
             with sqlite3.connect(path) as db:
                 db.execute("PRAGMA schema_version")
         except (OSError, sqlite3.Error) as error:
-            raise RuntimeError(f"SQLite storage is not writable: {path}. Check DATA_DIR, DATABASE_URL and disk permissions.") from error
+            raise RuntimeError(f"Mock SQLite storage is not writable: {path}. Check DATA_DIR, mock database paths and disk permissions.") from error

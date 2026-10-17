@@ -3,14 +3,27 @@ from datetime import date
 from typing import Literal
 from urllib.parse import urlparse
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import ArgumentError
+
+
+def postgres_database_url(value: str) -> str:
+    """Require PostgreSQL and use the installed psycopg 3 driver, including host DSNs."""
+    try:
+        url = make_url(value)
+    except (ArgumentError, ValueError):
+        raise ValueError("DATABASE_URL must be a PostgreSQL URL") from None
+    if url.drivername not in ("postgres", "postgresql", "postgresql+psycopg") or not url.database:
+        raise ValueError("DATABASE_URL must name a PostgreSQL database (postgresql+psycopg://.../database)")
+    return url.set(drivername="postgresql+psycopg").render_as_string(hide_password=False)
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", hide_input_in_errors=True)
 
-    database_url: str = "sqlite:///./jana.db"
+    database_url: str
     jwt_secret: str = Field(min_length=32)
     token_minutes: int = Field(default=60, ge=1, le=1440)
     demo_password: str | None = Field(default=None, min_length=12)
@@ -43,6 +56,11 @@ class Settings(BaseSettings):
     documentolog_public_url: str = "http://127.0.0.1:8000"
     documentolog_callback_url: str = "http://127.0.0.1:8000"
     documentolog_timeout_seconds: float = Field(default=10, ge=1, le=30)
+
+    @field_validator("database_url")
+    @classmethod
+    def validate_database_url(cls, value: str) -> str:
+        return postgres_database_url(value)
 
     @model_validator(mode="after")
     def validate_zup_connection(self):

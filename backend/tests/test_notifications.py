@@ -1,5 +1,4 @@
 from concurrent.futures import ThreadPoolExecutor
-import os
 from threading import Barrier
 
 import pytest
@@ -98,7 +97,6 @@ def test_notification_migration_preserves_populated_0006(api):
     assert target in api.get("/api/notifications").json()
 
 
-@pytest.mark.skipif(os.environ.get("POSTGRES_TEST") != "1", reason="Requires PostgreSQL concurrent updates")
 def test_concurrent_clear_records_each_effect_once(api):
     from app.models import AuditEvent
 

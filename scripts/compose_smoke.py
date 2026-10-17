@@ -90,6 +90,7 @@ notification = next(n for n in notifications if f"№{item['id']}:" in n["body"]
 for _ in range(2):
     assert call("PATCH", f"/notifications/{notification['id']}/read", token=tokens["employee"])["read"]
 
+call("POST", "/courses/1/progress", {"progress": 70}, tokens["employee"])
 assert call("POST", "/courses/1/complete", {"answer_index": 0}, tokens["employee"])["completed"]
 assert call("POST", "/courses/1/complete", {"answer_index": 0}, tokens["employee"])["completed"]
 answer = call("POST", "/assistant/query", {"question": "Как подать заявку на отпуск?"}, tokens["employee"])

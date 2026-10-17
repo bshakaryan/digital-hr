@@ -10,7 +10,7 @@ from app.modules.assistant_llm import generate_answer
 
 
 def settings(**changes):
-    values = {"database_url": "sqlite:///test-only.sqlite3",
+    values = {"database_url": "postgresql+psycopg://localhost/test_only",
               "jwt_secret": "test-only-jwt-secret-never-use-outside-pytest-2026",
               "llm_provider": "openai_compatible", "llm_api_key": "test-provider-key",
               "openai_api_key": None}
