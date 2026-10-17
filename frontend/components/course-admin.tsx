@@ -6,6 +6,7 @@ import { categoryLabel } from "@/lib/academy-labels";
 import { Empty, ErrorBox, Icon, Loading } from "./ui";
 import { useResource } from "./use-resource";
 import { KnowledgeAdmin } from "./knowledge-admin";
+import styles from "./academy-ux.module.css";
 
 type CourseDraft = { title: string; description: string; objectives: string; duration_minutes: number; category: CourseCategory };
 const scopeLabel: Record<KnowledgeFile["access_scope"], string> = {
@@ -81,14 +82,15 @@ export function CourseAdmin({ api, notify }: { api: ApiClient; notify: (message:
     finally { setBusy(false); }
   }
 
-  return <section className="academy-admin" aria-label="Управление курсами">
+  return <section className={`academy-admin ${styles.admin}`} aria-label="Управление курсами">
     <div className="academy-admin-heading"><div><span className="small-label">JANA ACADEMY · HR</span><h2>Управление курсами</h2><p>Подготовьте курс, проверьте материал и тест, затем назначьте его сотрудникам.</p></div><button className="button button-primary" type="button" onClick={() => { setSelected(null); setCreating(true); setNewCourse(false); setError(""); }}><Icon name="plus" size={18} /> Новый курс</button></div>
+    <div className={styles.adminFlow} aria-label="Порядок подготовки курса"><span>01 Курс</span><span>02 Документ</span><span>03 Тест</span><span>04 Публикация</span><span>05 Назначение</span></div>
     {error && <ErrorBox message={error} />}
     <div className="academy-admin-layout"><aside className="academy-course-library" aria-label="Каталог курсов"><div className="academy-library-heading"><h3>Курсы</h3><span>{catalog.data?.length ?? "—"}</span></div>
       {catalog.error && <ErrorBox message={catalog.error} retry={catalog.reload} />}
       {catalog.loading && !catalog.data ? <Loading /> : !catalog.data?.length ? <p className="academy-library-empty">Пока нет курсов. Начните с нового черновика.</p> : <div className="academy-admin-list">{catalog.data.map((item) => <button key={item.id} type="button" className={selected?.id === item.id && !creating ? "academy-admin-item is-active" : "academy-admin-item"} onClick={() => { setSelected(item); setCreating(false); setNewCourse(false); setError(""); }}><strong>{item.title}</strong><span>{item.status === "draft" ? "Черновик" : "Опубликован"}</span></button>)}</div>}
     </aside><div className="academy-admin-content">
-      {creating ? <section className="academy-editor" aria-label="Новый курс"><div className="academy-editor-title"><div><span className="small-label">ШАГ 1 ИЗ 5</span><h3>О курсе</h3><p>Название и цели помогут сотруднику понять, чему он научится.</p></div><span className="tag">Черновик</span></div><div className="academy-step-content"><form className="academy-admin-grid" onSubmit={create}>
+      {creating ? <section className="academy-editor" aria-label="Новый курс"><div className="academy-editor-title"><div><span className="small-label">ШАГ 1 ИЗ 5</span><h3>Создать черновик</h3><p>Сначала заполните сведения о курсе. Материалы и тест добавляются после сохранения.</p></div><span className="tag">Черновик</span></div><div className="academy-step-content"><form className="academy-admin-grid" onSubmit={create}>
         <label>Название курса<input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={200} required /></label>
         <label>Длительность, мин.<input type="number" min={1} max={480} value={duration} onChange={(event) => setDuration(event.target.value)} required /></label>
         <label className="academy-admin-wide">Категория<select value={category} onChange={(event) => setCategory(event.target.value as CourseCategory)}>{Object.entries(categoryLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
