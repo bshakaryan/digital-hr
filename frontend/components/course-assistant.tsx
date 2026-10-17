@@ -1,30 +1,55 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ApiClient, errorMessage, type AssistantAnswer } from "@/lib/api";
-import { ErrorBox } from "./ui";
+import { Icon } from "./ui";
 import styles from "./assistant-ux.module.css";
 
 const suggestions = ["О чём этот материал?", "Что важно запомнить?"];
+interface CourseExchange { courseId: number; question: string; result: AssistantAnswer }
 
 export function CourseAssistant({ api, courseId }: { api: ApiClient; courseId: number }) {
   const [question, setQuestion] = useState("");
-  const [asked, setAsked] = useState("");
-  const [result, setResult] = useState<AssistantAnswer | null>(null);
+  const [exchanges, setExchanges] = useState<CourseExchange[]>([]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const busy = useRef(false);
+  const transcript = useRef<HTMLDivElement>(null);
+  const followConversation = useRef(true);
+  const visibleExchanges = exchanges.filter((exchange) => exchange.courseId === courseId);
+
+  useEffect(() => {
+    if (!followConversation.current) return;
+    const frame = requestAnimationFrame(() => {
+      const container = transcript.current;
+      if (container && followConversation.current) container.scrollTop = container.scrollHeight;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [visibleExchanges.length, pending, error]);
+
+  function trackReadingPosition() {
+    const container = transcript.current;
+    if (container) followConversation.current = container.scrollHeight - container.scrollTop - container.clientHeight < 72;
+  }
+
+  function revealSource(details: HTMLDetailsElement) {
+    if (!details.open) return;
+    requestAnimationFrame(() => {
+      const container = transcript.current;
+      if (container && details.open) container.scrollTop += details.getBoundingClientRect().top - container.getBoundingClientRect().top - 8;
+    });
+  }
 
   async function askQuestion(value: string) {
     const trimmed = value.trim();
     if (busy.current || trimmed.length < 3) return;
     busy.current = true;
+    followConversation.current = true;
     setPending(true);
     setError("");
     try {
       const answer = await api.post<AssistantAnswer>(`/courses/${courseId}/ask`, { question: trimmed });
-      setResult(answer);
-      setAsked(trimmed);
+      setExchanges((old) => [...old, { courseId, question: trimmed, result: answer }]);
       setQuestion("");
     } catch (cause) {
       setQuestion(value);
@@ -37,11 +62,21 @@ export function CourseAssistant({ api, courseId }: { api: ApiClient; courseId: n
 
   function submit(event: FormEvent) { event.preventDefault(); void askQuestion(question); }
 
-  return <section className="course-ai" aria-label="AI Jana по материалу курса">
-    <p className={styles.courseIntro}><strong>Сәлем! Я AI Jana.</strong> Спросите о материале этого курса — покажу ответ и фрагмент документа, на котором он основан.</p>
-    <div className={styles.courseSuggestions} aria-label="Примеры вопросов">{suggestions.map((suggestion) => <button type="button" key={suggestion} disabled={pending} onClick={() => void askQuestion(suggestion)}>{suggestion}</button>)}</div>
-    <form onSubmit={submit}><label htmlFor={`course-ai-${courseId}`}>Ваш вопрос по курсу</label><input id={`course-ai-${courseId}`} value={question} onChange={(event) => setQuestion(event.target.value)} minLength={3} maxLength={1000} required placeholder="Например, что отражает статус отправления?" disabled={pending} /><button className="button button-primary" disabled={pending || question.trim().length < 3}>{pending ? "Ищем…" : "Спросить"}</button></form>
-    {error && <ErrorBox message={error} />}
-    {result && <div className={styles.courseAnswer} aria-live="polite"><span>AI JANA · ОТВЕТ ПО МАТЕРИАЛАМ КУРСА</span><p><strong>Вы спросили:</strong> {asked}</p><p>{result.answer}</p>{result.sources.length > 0 && <div className={styles.courseSources}><strong>Проверить источники · {result.sources.length}</strong>{result.sources.map((source, index) => <details key={`${source.document_id}-${index}`}><summary>[{index + 1}] {source.source_filename || source.title} · {source.page_number ? `стр. ${source.page_number}` : source.section}</summary><div>{source.content}</div></details>)}</div>}{result.escalate_to_hr && <small>В прикреплённых документах нет надёжного ответа. Обратитесь в HR.</small>}</div>}
+  return <section className={`course-ai ${styles.courseChat}`} aria-label="AI Jana по материалу курса">
+    <div className={styles.courseHeader}><span className={styles.brandMark} aria-hidden="true"><Icon name="spark" size={17} /></span><div><strong>AI Jana</strong><span>Ответы только по материалам этого курса</span></div></div>
+    <div className={styles.courseTranscript} ref={transcript} onScroll={trackReadingPosition} aria-label="Вопросы и ответы по курсу">
+      {visibleExchanges.length === 0 && <div className={styles.courseWelcome}><strong>Сәлем! Спросите о материале курса.</strong><p>Я покажу ответ вместе с фрагментом источника.</p><div className={styles.suggestions}>{suggestions.map((suggestion) => <button type="button" key={suggestion} disabled={pending} onClick={() => void askQuestion(suggestion)}>{suggestion}</button>)}</div></div>}
+      {visibleExchanges.map((exchange, index) => <div className={styles.turn} key={index}>
+        <div className={styles.userRow}><div className={styles.userBubble}>{exchange.question}</div></div>
+        <div className={styles.assistantRow}><span className={styles.avatar} aria-label="AI Jana"><Icon name="spark" size={15} /></span><div className={styles.messageContent}><div className={`${styles.assistantBubble} ${exchange.result.escalate_to_hr ? styles.refusalBubble : ""}`}>{exchange.result.answer}</div>
+          {exchange.result.sources.length > 0 && <div className={styles.sourceList} aria-label="Источники ответа">{exchange.result.sources.map((source, sourceIndex) => <details className={styles.source} key={`${source.document_id}-${sourceIndex}`} onToggle={(event) => revealSource(event.currentTarget)}><summary><span className={styles.sourceNumber}>[{sourceIndex + 1}]</span><span className={styles.sourceTitle}>{source.source_filename || source.title}</span><Icon name="chevron" size={13} /></summary><div className={styles.sourceDetail}><strong>{source.title}</strong><span>{source.section}{source.page_number ? ` · стр. ${source.page_number}` : ""}</span><p>{source.content}</p>{source.classification === "synthetic_demo" && <small>Демонстрационный материал, не кадровое правило компании.</small>}</div></details>)}</div>}
+          {exchange.result.sources.some((source) => source.classification === "external_legal_snapshot") && <p className={styles.safetyNote}>Копия закона: актуальность нормы не проверена.</p>}
+          {exchange.result.escalate_to_hr && <p className={styles.refusalNote}><Icon name="people" size={15} /> Обратитесь к HR. В материалах курса нет надёжного ответа.</p>}
+        </div></div>
+      </div>)}
+      {pending && <div className={styles.assistantRow} role="status"><span className={styles.avatar} aria-hidden="true"><Icon name="spark" size={15} /></span><span className={styles.loadingBubble}><span className={styles.loadingDots} aria-hidden="true"><i /><i /><i /></span> Ищу в материалах курса…</span></div>}
+      {error && <div className={styles.error} role="alert"><span>Не удалось получить ответ: {error}</span><button type="button" onClick={() => void askQuestion(question)} disabled={pending}>Повторить</button></div>}
+    </div>
+    <form className={styles.courseComposer} onSubmit={submit}><label className="sr-only" htmlFor={`course-ai-${courseId}`}>Ваш вопрос по курсу</label><input id={`course-ai-${courseId}`} value={question} onChange={(event) => setQuestion(event.target.value)} minLength={3} maxLength={1000} required placeholder="Спросите о материале курса…" disabled={pending} /><button type="submit" aria-label="Отправить вопрос по курсу" disabled={pending || question.trim().length < 3}><Icon name="send" size={18} /></button></form>
   </section>;
 }

@@ -1,17 +1,12 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ApiClient, errorMessage, type AssistantAnswer, type Knowledge } from "@/lib/api";
-import { ErrorBox, Icon, Loading, Modal } from "./ui";
+import { Icon, Loading, Modal } from "./ui";
 import { useResource } from "./use-resource";
-import { PageHeading } from "./workspace";
 import styles from "./assistant-ux.module.css";
 
-const suggestions = [
-  "Как подать заявку на отпуск?",
-  "Как устроено обучение?",
-  "Какие документы есть в базе знаний?",
-];
+const suggestions = ["Как подать заявку на отпуск?", "Как устроено обучение?", "Какие документы есть в базе знаний?"];
 const leaveQuestion = /(отпуск|демалыс|leave)/i;
 
 interface Exchange { question: string; result: AssistantAnswer }
@@ -23,19 +18,42 @@ export function Assistant({ api, onCreateLeave }: { api: ApiClient; onCreateLeav
   const [error, setError] = useState("");
   const [sourceId, setSourceId] = useState<number | null>(null);
   const busy = useRef(false);
-  const end = useRef<HTMLDivElement>(null);
+  const transcript = useRef<HTMLDivElement>(null);
+  const followConversation = useRef(true);
+
+  useEffect(() => {
+    if (!followConversation.current) return;
+    const frame = requestAnimationFrame(() => {
+      const container = transcript.current;
+      if (container && followConversation.current) container.scrollTop = container.scrollHeight;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [exchanges.length, pending, error]);
+
+  function trackReadingPosition() {
+    const container = transcript.current;
+    if (container) followConversation.current = container.scrollHeight - container.scrollTop - container.clientHeight < 72;
+  }
+
+  function revealSource(details: HTMLDetailsElement) {
+    if (!details.open) return;
+    requestAnimationFrame(() => {
+      const container = transcript.current;
+      if (container && details.open) container.scrollTop += details.getBoundingClientRect().top - container.getBoundingClientRect().top - 8;
+    });
+  }
 
   async function ask(value: string) {
     const trimmed = value.trim();
     if (busy.current || trimmed.length < 3) return;
     busy.current = true;
+    followConversation.current = true;
     setPending(true);
     setError("");
     try {
       const result = await api.post<AssistantAnswer>("/assistant/query", { question: trimmed });
       setExchanges((old) => [...old, { question: trimmed, result }]);
       setQuestion("");
-      requestAnimationFrame(() => end.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
     } catch (cause) {
       setQuestion(value);
       setError(errorMessage(cause));
@@ -49,37 +67,50 @@ export function Assistant({ api, onCreateLeave }: { api: ApiClient; onCreateLeav
 
   function leaveAction() {
     return onCreateLeave
-      ? <button type="button" className="button button-primary" onClick={onCreateLeave}>Оформить отпуск <Icon name="arrow" size={16} /></button>
-      : <a className="button button-primary" href="#requests">Оформить отпуск <Icon name="arrow" size={16} /></a>;
+      ? <button type="button" className={styles.action} onClick={onCreateLeave}>Оформить отпуск <Icon name="arrow" size={15} /></button>
+      : <a className={styles.action} href="#requests">Оформить отпуск <Icon name="arrow" size={15} /></a>;
   }
 
   return <>
-    <PageHeading eyebrow="ПОМОЩНИК ПО ДОКУМЕНТАМ" title="AI Jana" description="Спросите о заявках, обучении и доступных документах." />
     <section className={`panel assistant-panel ${styles.chat}`} aria-label="Диалог с AI Jana">
-      <div className="assistant-panel-header"><span className="assistant-mark"><Icon name="spark" size={23} /></span><div><strong>AI Jana</strong><span><span className="live-dot" /> Поиск по доступным документам</span></div><span className="tag">С источниками</span></div>
-      <div className="chat-body" aria-live="polite" aria-relevant="additions text">
-        {exchanges.length === 0 && <div className={styles.welcome}>
-          <span className={styles.welcomeIcon}><Icon name="spark" size={34} /></span>
-          <span className={styles.eyebrow}>AI JANA · РЯДОМ, КОГДА НУЖЕН ОТВЕТ</span>
-          <h2>Сәлем! Чем могу помочь?</h2>
-          <p>Задайте вопрос — я найду ответ в доступных вам документах и покажу, где его проверить.</p>
-          <div className={styles.promptGroup}><span className={styles.groupLabel}>Можно спросить</span><div className={styles.suggestions}>{suggestions.map((suggestion) => <button type="button" key={suggestion} onClick={() => void ask(suggestion)} disabled={pending}>{suggestion}<Icon name="arrow" size={16} /></button>)}</div></div>
-          <div className={styles.quickActions}><span className={styles.groupLabel}>Или перейти сразу</span><div className={styles.actionRow}>{leaveAction()}<a className="button button-secondary" href="#academy"><Icon name="book" size={17} /> Мои курсы <Icon name="arrow" size={15} /></a></div></div>
-          <small className={styles.guidance}>AI Jana отвечает по документам. Заявку вы оформляете сами; решение принимает человек.</small>
-        </div>}
-        {exchanges.map((exchange, index) => <div className="exchange" key={index}>
-          <div className="user-message"><span className="small-label">ВЫ</span><p>{exchange.question}</p></div>
-          <div className="assistant-message"><span className="assistant-message-icon"><Icon name="spark" size={20} /></span><div className={styles.answerContent}>
-            <span className="small-label">AI JANA · ОТВЕТ ПО ДОКУМЕНТАМ</span><div className={styles.answerCard}><p>{exchange.result.answer}</p></div>
-            {exchange.result.sources.length > 0 && <div className="sources"><span className="small-label">ПРОВЕРИТЬ ИСТОЧНИКИ · {exchange.result.sources.length}</span>{exchange.result.sources.map((source, sourceIndex) => <button type="button" className="source-link" key={`${source.document_id}-${sourceIndex}`} onClick={() => setSourceId(source.document_id)}><span>{sourceIndex + 1}</span><div><strong>{source.title}</strong><small>{source.source_filename ? `${source.source_filename} · ` : ""}{source.page_number ? `стр. ${source.page_number} · ` : ""}{source.section}</small></div><Icon name="arrow" size={16} /></button>)}</div>}
-            {leaveQuestion.test(exchange.question) && <div className={styles.contextAction}><div><strong>Хотите перейти к заявке?</strong><span>{onCreateLeave ? "Выберите даты и проверьте расчёт в форме." : "В разделе заявок откройте форму и проверьте расчёт."}</span></div>{leaveAction()}</div>}
-            {exchange.result.escalate_to_hr && <div className="notice warning"><Icon name="people" size={18} /><span>По этому вопросу обратитесь к HR лично. Помощник не отправляет обращения автоматически.</span></div>}
-            <small className="answer-mode">Проверьте ответ по указанному источнику; копия закона не подтверждает актуальность нормы.</small>
-          </div></div>
-        </div>)}
-        {pending && <Loading label="Ищем в базе знаний…" />}<div ref={end} />
+      <header className={styles.header}>
+        <span className={styles.brandMark} aria-hidden="true"><Icon name="spark" size={22} /></span>
+        <div className={styles.identity}><h1>AI Jana</h1><span>Помощник по доступным документам</span></div>
+        <span className={styles.headerBadge}>Демо</span>
+      </header>
+      <div className={styles.transcript} ref={transcript} onScroll={trackReadingPosition} aria-label="Сообщения">
+        <div className={styles.thread}>
+          {exchanges.length === 0 && <div className={styles.intro}>
+            <span className={styles.introMark} aria-hidden="true"><Icon name="spark" size={21} /></span>
+            <div className={styles.introText}><strong>Сәлем! Чем могу помочь?</strong><p>Спросите о заявках, обучении или документах. Я покажу, на чём основан ответ.</p></div>
+            <div className={styles.introOptions}>
+              <span>Попробуйте спросить</span>
+              <div className={styles.suggestions}>{suggestions.map((suggestion) => <button type="button" key={suggestion} onClick={() => void ask(suggestion)} disabled={pending}>{suggestion}</button>)}</div>
+              <span>Быстрые действия</span>
+              <div className={styles.quickActions}>{leaveAction()}<a className={styles.secondaryAction} href="#academy">Мои курсы <Icon name="arrow" size={15} /></a></div>
+            </div>
+          </div>}
+          {exchanges.map((exchange, index) => <div className={styles.turn} key={index}>
+            <div className={styles.userRow}><div className={styles.userBubble}>{exchange.question}</div></div>
+            <div className={styles.assistantRow}>
+              <span className={styles.avatar} aria-label="AI Jana"><Icon name="spark" size={15} /></span>
+              <div className={styles.messageContent}>
+                <div className={`${styles.assistantBubble} ${exchange.result.escalate_to_hr ? styles.refusalBubble : ""}`}>{exchange.result.answer}</div>
+                {exchange.result.sources.length > 0 && <div className={styles.sourceList} aria-label="Источники ответа">{exchange.result.sources.map((source, sourceIndex) => <details className={styles.source} key={`${source.document_id}-${sourceIndex}`} onToggle={(event) => revealSource(event.currentTarget)}><summary><span className={styles.sourceNumber}>[{sourceIndex + 1}]</span><span className={styles.sourceTitle}>{source.source_filename || source.title}</span><Icon name="chevron" size={13} /></summary><div className={styles.sourceDetail}><strong>{source.title}</strong><span>{source.section}{source.page_number ? ` · стр. ${source.page_number}` : ""}{source.version ? ` · версия ${source.version}` : ""}</span><p>{source.content}</p>{source.classification === "synthetic_demo" && <small>Демонстрационный материал, не кадровое правило компании.</small>}<button type="button" onClick={() => setSourceId(source.document_id)}>Открыть полный источник <Icon name="arrow" size={13} /></button></div></details>)}</div>}
+                {exchange.result.sources.some((source) => source.classification === "external_legal_snapshot") && <p className={styles.safetyNote}>Копия закона: актуальность нормы не проверена.</p>}
+                {exchange.result.escalate_to_hr && <p className={styles.refusalNote}><Icon name="people" size={15} /> Обратитесь к HR лично. Помощник не отправляет обращения автоматически.</p>}
+                {leaveQuestion.test(exchange.question) && <div className={styles.contextAction}><span>Хотите перейти к заявке?</span>{leaveAction()}</div>}
+              </div>
+            </div>
+          </div>)}
+          {pending && <div className={styles.assistantRow} role="status"><span className={styles.avatar} aria-hidden="true"><Icon name="spark" size={15} /></span><span className={styles.loadingBubble}><span className={styles.loadingDots} aria-hidden="true"><i /><i /><i /></span> Ищу ответ в документах…</span></div>}
+          {error && <div className={styles.error} role="alert"><span>Не удалось получить ответ: {error}</span><button type="button" onClick={() => void ask(question)} disabled={pending}>Повторить</button></div>}
+        </div>
       </div>
-      <div className="chat-composer">{error && <ErrorBox message={error} />}<form onSubmit={submit}><label className="sr-only" htmlFor="assistant-question">Ваш вопрос</label><textarea id="assistant-question" rows={2} placeholder="Например, как подать заявку на отпуск?" minLength={3} maxLength={1000} required value={question} onChange={(event) => setQuestion(event.target.value)} disabled={pending} /><button className="button button-primary" aria-label="Отправить вопрос" disabled={pending || question.trim().length < 3}><Icon name="send" size={20} /></button></form><div className="composer-footnote"><span>Ответ основан на доступных документах</span><span>{question.length}/1000</span></div></div>
+      <div className={styles.composer}>
+        <form onSubmit={submit}><label className="sr-only" htmlFor="assistant-question">Ваш вопрос</label><textarea id="assistant-question" rows={2} placeholder="Напишите вопрос AI Jana…" minLength={3} maxLength={1000} required value={question} onChange={(event) => setQuestion(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void ask(question); } }} disabled={pending} /><button type="submit" aria-label="Отправить вопрос" disabled={pending || question.trim().length < 3}><Icon name="send" size={19} /></button></form>
+        <div className={styles.composerMeta}><span>Ответы могут опираться на демонстрационные материалы. Проверяйте источники.</span><span>{question.length}/1000</span></div>
+      </div>
     </section>
     {sourceId !== null && <KnowledgeReader key={sourceId} api={api} id={sourceId} onClose={() => setSourceId(null)} />}
   </>;
@@ -87,5 +118,5 @@ export function Assistant({ api, onCreateLeave }: { api: ApiClient; onCreateLeav
 
 function KnowledgeReader({ api, id, onClose }: { api: ApiClient; id: number; onClose: () => void }) {
   const resource = useResource<Knowledge>(api, `/knowledge/${id}`);
-  return <Modal title="Источник ответа" wide onClose={onClose}>{resource.error ? <ErrorBox message={resource.error} retry={resource.reload} /> : resource.loading ? <Loading /> : resource.data && <article className="knowledge-content"><span className="eyebrow">ФРАГМЕНТ №{resource.data.document_id}</span><h2>{resource.data.title}</h2><span className="tag">{resource.data.section}{resource.data.page_number ? ` · стр. ${resource.data.page_number}` : ""}</span><div>{resource.data.content}</div>{resource.data.source_filename && <p className="muted small-text">Файл: {resource.data.source_filename} · версия: {resource.data.version}. {resource.data.source_note}</p>}{resource.data.file_id && <button className="button button-secondary" onClick={() => api.download(`/knowledge-files/${resource.data!.file_id}/download`, resource.data!.source_filename || "source").catch(() => {})}>Скачать оригинал</button>}{!resource.data.source_filename && <p className="muted small-text">Ранее созданная запись демонстрационной базы знаний.</p>}</article>}</Modal>;
+  return <Modal title="Источник ответа" wide onClose={onClose}>{resource.error ? <div role="alert">Не удалось открыть источник: {resource.error} <button type="button" onClick={resource.reload}>Повторить</button></div> : resource.loading ? <Loading /> : resource.data && <article className="knowledge-content"><span className="eyebrow">ФРАГМЕНТ №{resource.data.document_id}</span><h2>{resource.data.title}</h2><span className="tag">{resource.data.section}{resource.data.page_number ? ` · стр. ${resource.data.page_number}` : ""}</span><div>{resource.data.content}</div>{resource.data.source_filename && <p className="muted small-text">Файл: {resource.data.source_filename} · версия: {resource.data.version}. {resource.data.source_note}</p>}{resource.data.file_id && <button className="button button-secondary" onClick={() => api.download(`/knowledge-files/${resource.data!.file_id}/download`, resource.data!.source_filename || "source").catch(() => {})}>Скачать оригинал</button>}{!resource.data.source_filename && <p className="muted small-text">Ранее созданная запись демонстрационной базы знаний.</p>}</article>}</Modal>;
 }
