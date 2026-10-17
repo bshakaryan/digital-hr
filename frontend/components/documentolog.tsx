@@ -16,13 +16,14 @@ const labels: Record<string, string> = {
   declined: "Подписант отказал", needs_review: "Результат отправки неизвестен — нужна сверка",
 };
 
-export function DocumentologDocument({ api, id, me }: { api: ApiClient; id: number; me: Profile }) {
+export function DocumentologDocument({ api, id, me, employeeId }: { api: ApiClient; id: number; me: Profile; employeeId: number }) {
   const resource = useResource<DocumentStatus>(api, `/requests/${id}/documentolog`);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [recipient, setRecipient] = useState("");
   const [link, setLink] = useState("");
   const item = resource.data;
+  const canManage = me.role === "hr_admin" && employeeId !== me.id;
   useEffect(() => {
     if (!item || !["signing", "creating", "needs_review", "completed_reported"].includes(item.status)) return;
     const timer = setInterval(() => { if (document.visibilityState === "visible") resource.reload(); }, 15000);
@@ -48,13 +49,13 @@ export function DocumentologDocument({ api, id, me }: { api: ApiClient; id: numb
       <strong>{labels[item.status] || item.status}</strong>
       {item.external_id && <p>Номер: {item.external_id}</p>}
       {item.file_sha256 && <p className="muted small-text" style={{ overflowWrap: "anywhere" }}>SHA-256 документа: {item.file_sha256}</p>}
-      <p className="muted small-text">Подписание отслеживается отдельно от решения HR и учёта дней отпуска.</p>
+      <p className="muted small-text">Подписание отслеживается отдельно от финального решения и учёта дней отпуска.</p>
       {item.last_error && <ErrorBox message={item.last_error} />}
-      {me.role === "hr_admin" && item.mode !== "disabled" && item.status === "not_created" && <>
+      {canManage && item.mode !== "disabled" && item.status === "not_created" && <>
         {item.mode === "real" && <label>ИИН получателя<input value={recipient} onChange={event => setRecipient(event.target.value)} inputMode="numeric" maxLength={12} disabled={pending} /></label>}
         <button className="button button-secondary" disabled={pending || (item.mode === "real" && !/^\d{12}$/.test(recipient))} onClick={create}>{pending ? "Подготавливаем…" : item.mode === "mock" ? "Создать демонстрационный документ" : "Передать документ в Documentolog"}</button>
       </>}
-      {me.role === "hr_admin" && item.status !== "not_created" && !link && <button className="text-button" disabled={pending} onClick={getLink}>Получить ссылку на сессию</button>}
+      {canManage && item.status !== "not_created" && !link && <button className="text-button" disabled={pending} onClick={getLink}>Получить ссылку на сессию</button>}
       {link && <a className="button button-primary" href={link} target="_blank" rel="noopener noreferrer">{item.mode === "mock" ? "Открыть имитацию подписания" : "Открыть Documentolog"}<Icon name="arrow" size={16} /></a>}
       {item.view_url && <a className="text-button" href={item.view_url} target="_blank" rel="noopener noreferrer">Открыть документ<Icon name="arrow" size={16} /></a>}
     </>}{error && <ErrorBox message={error} />}

@@ -16,10 +16,11 @@ router = APIRouter(prefix="/audit", tags=["audit"], dependencies=[Depends(requir
 
 ACTION_LABELS = {
     "auth.login": "Вход в систему", "request.created": "Заявка отправлена",
-    "request.manager_approved": "Руководитель согласовал заявку", "request.approved": "HR согласовал заявку",
+    "request.manager_approved": "Руководитель согласовал заявку", "request.approved": "HR согласовал заявку", "request.approved_by_manager": "Руководитель согласовал заявку",
     "request.rejected": "Заявка отклонена", "request.withdrawn": "Заявка отозвана",
     "request.replaced": "Период заменён новой заявкой", "request.cancellation_requested": "Запрошена отмена отпуска",
     "request.cancelled": "HR подтвердил отмену", "request.cancellation_rejected": "HR отклонил отмену",
+    "request.cancelled_by_manager": "Руководитель подтвердил отмену", "request.cancellation_rejected_by_manager": "Руководитель отклонил отмену",
     "leave.deducted": "Учтены дни отпуска", "zup.leave_registered": "Отпуск передан в 1С",
     "zup.leave_cancelled": "Возврат дней подтверждён 1С", "notification.read": "Уведомление прочитано",
     "notification.cleared": "Прочитанное уведомление убрано из списка",

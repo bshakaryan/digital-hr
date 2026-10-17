@@ -109,6 +109,7 @@ class RequestOut(BaseModel):
     created_at: UTCDateTime
     history: list[HistoryOut]
     calendar_days: int
+    approval_route: Literal["standard", "manager_to_hr", "hr_to_manager"]
     can_review: bool = False
     cancellation_sync_status: Literal["pending", "synced", "error"] | None = None
     cancellation_reference: str | None = None

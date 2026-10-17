@@ -3,7 +3,7 @@ import json
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -15,15 +15,48 @@ from app.modules.leave_balance import quote_leave
 from app.modules.notifications import notify
 from app.modules.zup_sync import deliver, enqueue
 from app.schemas import HistoryOut, LeaveCalculation, RequestCreate, RequestDecision, RequestOut
-from app.security import current_user, visible_employee_ids
+from app.security import current_user
 
 router = APIRouter(prefix="/requests", tags=["requests"])
 
 
+def approval_route(employee: Employee):
+    if employee.role == "manager":
+        return "manager_to_hr"
+    if employee.role == "hr_admin":
+        return "hr_to_manager"
+    return "standard"
+
+
+def final_reviewer_ids(db: Session, employee: Employee):
+    reviewer_role = "manager" if employee.role == "hr_admin" else "hr_admin"
+    return list(db.scalars(select(Employee.id).where(Employee.role == reviewer_role, Employee.id != employee.id)))
+
+
 def review_allowed(user, employee, item):
-    return bool(user and user.id != item.employee_id and (
-        (item.status == "submitted" and user.role == "manager" and employee.manager_id == user.id) or
-        (item.status in ("manager_approved", "cancellation_requested") and user.role == "hr_admin")))
+    if not user or user.id == item.employee_id:
+        return False
+    route = approval_route(employee)
+    if item.status == "submitted":
+        return user.role == "manager" and (
+            (route == "standard" and employee.manager_id == user.id) or route == "hr_to_manager")
+    if item.status == "manager_approved":
+        return user.role == "hr_admin" and route in ("standard", "manager_to_hr")
+    if item.status == "cancellation_requested":
+        return user.role == ("manager" if route == "hr_to_manager" else "hr_admin")
+    return False
+
+
+def visible_requests(user: Employee):
+    if user.role == "hr_admin":
+        return True
+    if user.role == "manager":
+        return or_(
+            LeaveRequest.employee_id == user.id,
+            LeaveRequest.employee_id.in_(select(Employee.id).where(Employee.manager_id == user.id)),
+            LeaveRequest.employee_id.in_(select(Employee.id).where(Employee.role == "hr_admin")),
+        )
+    return LeaveRequest.employee_id == user.id
 
 
 def cancellation_block_reason(db, item):
@@ -55,6 +88,7 @@ def present(db: Session, item: LeaveRequest, user=None) -> RequestOut:
         status=item.status, version=item.version, created_at=item.created_at,
         history=[HistoryOut(status=h.status, actor_name=name, comment=h.comment, created_at=h.created_at) for h, name in history],
         calendar_days=(item.end_date - item.start_date).days + 1,
+        approval_route=approval_route(employee),
         can_review=review_allowed(user, employee, item),
         cancellation_allowed=item.status == "approved" and reason is None,
         cancellation_block_reason=reason,
@@ -64,7 +98,7 @@ def present(db: Session, item: LeaveRequest, user=None) -> RequestOut:
 
 
 def accessible(db: Session, user: Employee, request_id: int):
-    item = db.scalar(select(LeaveRequest).where(LeaveRequest.id == request_id, LeaveRequest.employee_id.in_(visible_employee_ids(db, user))))
+    item = db.scalar(select(LeaveRequest).where(LeaveRequest.id == request_id, visible_requests(user)))
     if item is None:
         raise HTTPException(404, "Заявка не найдена")
     return item
@@ -72,7 +106,7 @@ def accessible(db: Session, user: Employee, request_id: int):
 
 @router.get("", response_model=list[RequestOut])
 def requests(user: Employee = Depends(current_user), db: Session = Depends(get_db)):
-    items = db.scalars(select(LeaveRequest).where(LeaveRequest.employee_id.in_(visible_employee_ids(db, user))).order_by(LeaveRequest.id.desc())).all()
+    items = db.scalars(select(LeaveRequest).where(visible_requests(user)).order_by(LeaveRequest.id.desc())).all()
     return [present(db, item, user) for item in items]
 
 
@@ -132,21 +166,33 @@ def create_request(data: RequestCreate, idempotency_key: Annotated[str, Header(m
 
 
 def new_request(db, user, data, idempotency_key, digest):
-    manager = db.get(Employee, user.manager_id) if user.manager_id is not None else None
-    if manager is None or manager.role != "manager":
-        raise HTTPException(409, "Для сотрудника не настроен маршрут согласования с непосредственным руководителем")
+    route = approval_route(user)
+    if route == "standard":
+        manager = db.get(Employee, user.manager_id) if user.manager_id is not None else None
+        if manager is None or manager.role != "manager":
+            raise HTTPException(409, "Для сотрудника не настроен маршрут согласования с непосредственным руководителем")
+        reviewers = [manager]
+    else:
+        reviewers = list(db.scalars(select(Employee).where(
+            Employee.role == ("hr_admin" if route == "manager_to_hr" else "manager"), Employee.id != user.id)))
+        if not reviewers:
+            raise HTTPException(409, "Для одноэтапной заявки не настроен независимый согласующий")
     ensure_no_overlap(db, user.id, data.start_date, data.end_date)
     quote, available = quote_leave(db, user, data.start_date, data.end_date)
     if quote.days_count > available:
         raise HTTPException(409, f"Недостаточно дней отпуска: запрошено {quote.days_count}, доступно {available}")
-    item = LeaveRequest(employee_id=user.id, start_date=data.start_date, end_date=data.end_date, comment=data.comment, idempotency_key=idempotency_key, payload_hash=digest,
+    item = LeaveRequest(employee_id=user.id, start_date=data.start_date, end_date=data.end_date, comment=data.comment,
+        status="manager_approved" if route == "manager_to_hr" else "submitted", idempotency_key=idempotency_key, payload_hash=digest,
         days_count=quote.days_count, excluded_dates_json=json.dumps([day.isoformat() for day in quote.excluded_dates]), calendar_version=quote.calendar_version)
     db.add(item)
     db.flush()
     db.add(RequestHistory(request_id=item.id, actor_id=user.id, status="submitted", comment=data.comment))
     record(db, user.id, "request.created", "request", item.id)
-    notify(db, user.id, "request_submitted", "Заявка отправлена", f"Заявка №{item.id} ожидает решения руководителя.", entity_type="request", entity_id=item.id, actor_id=user.id)
-    notify(db, manager.id, "request_manager_review", "Новая заявка на отпуск", f"{user.full_name}: заявка №{item.id} ожидает решения руководителя.", entity_type="request", entity_id=item.id, actor_id=user.id)
+    reviewer_title = "HR" if route == "manager_to_hr" else "руководителя"
+    notify(db, user.id, "request_submitted", "Заявка отправлена", f"Заявка №{item.id} ожидает решения {reviewer_title}.", entity_type="request", entity_id=item.id, actor_id=user.id)
+    kind = "request_hr_review" if route == "manager_to_hr" else "request_manager_review"
+    for reviewer in reviewers:
+        notify(db, reviewer.id, kind, "Новая заявка на отпуск", f"{user.full_name}: заявка №{item.id} ожидает вашего решения.", entity_type="request", entity_id=item.id, actor_id=user.id)
     return item
 
 
@@ -163,14 +209,15 @@ def decide(request_id: int, data: RequestDecision, user: Employee = Depends(curr
     if user.id == item.employee_id:
         raise HTTPException(403, "Нельзя принять решение по этой заявке")
     current_status = item.status
+    route = approval_route(owner)
     if current_status == "submitted":
-        if not (user.role == "manager" and owner.manager_id == user.id):
+        if not review_allowed(user, owner, item):
             if user.role == "hr_admin":
                 raise HTTPException(409, "Сначала заявку должен согласовать непосредственный руководитель")
             raise HTTPException(403, "Нельзя принять решение по этой заявке")
-        next_status = "manager_approved" if data.status == "approved" else "rejected"
+        next_status = "manager_approved" if route == "standard" and data.status == "approved" else data.status
     elif current_status == "manager_approved":
-        if user.role != "hr_admin":
+        if not review_allowed(user, owner, item):
             if user.role == "manager" and owner.manager_id == user.id:
                 raise HTTPException(409, "Решение руководителя сохранено; заявка ожидает решения HR")
             raise HTTPException(403, "Нельзя принять решение по этой заявке")
@@ -182,7 +229,7 @@ def decide(request_id: int, data: RequestDecision, user: Employee = Depends(curr
         db.rollback()
         raise HTTPException(409, "Заявка уже изменена. Обновите список")
     remaining_balance = None
-    if current_status == "manager_approved" and next_status == "approved":
+    if next_status == "approved":
         # Every balance writer locks the employee row. This serializes approvals of
         # different requests for one employee in PostgreSQL; SQLite tests cannot
         # establish that locking guarantee.
@@ -204,7 +251,8 @@ def decide(request_id: int, data: RequestDecision, user: Employee = Depends(curr
         remaining_balance = available - requested_days
         record(db, user.id, "leave.deducted", "request", request_id)
     db.add(RequestHistory(request_id=request_id, actor_id=user.id, status=next_status, comment=data.comment))
-    record(db, user.id, f"request.{next_status}", "request", request_id)
+    action = "request.approved_by_manager" if next_status == "approved" and route == "hr_to_manager" else f"request.{next_status}"
+    record(db, user.id, action, "request", request_id)
     if next_status == "manager_approved":
         notify(db, item.employee_id, "request_manager_approved", "Руководитель согласовал заявку", f"Заявка №{item.id} передана на финальную проверку HR. {data.comment}", entity_type="request", entity_id=item.id, actor_id=user.id)
         for hr in db.scalars(select(Employee).where(Employee.role == "hr_admin", Employee.id != item.employee_id)).all():

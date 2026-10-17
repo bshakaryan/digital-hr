@@ -8,10 +8,11 @@ import { PageHeading } from "./workspace";
 
 const actions: Record<string, string> = {
   "auth.login": "Вход в систему", "request.created": "Заявка отправлена",
-  "request.manager_approved": "Решение руководителя", "request.approved": "Согласование HR",
+  "request.manager_approved": "Решение руководителя", "request.approved": "Согласование HR", "request.approved_by_manager": "Финальное согласование руководителя",
   "request.rejected": "Заявка отклонена", "request.withdrawn": "Заявка отозвана",
   "request.replaced": "Заявка заменена", "request.cancellation_requested": "Запрос отмены",
-  "request.cancelled": "Отмена подтверждена", "request.cancellation_rejected": "Отмена отклонена",
+  "request.cancelled": "Отмена подтверждена HR", "request.cancellation_rejected": "Отмена отклонена HR",
+  "request.cancelled_by_manager": "Отмена подтверждена руководителем", "request.cancellation_rejected_by_manager": "Отмена отклонена руководителем",
   "leave.deducted": "Учёт дней", "zup.leave_registered": "Передача в 1С",
   "zup.leave_cancelled": "Возврат дней", "notification.read": "Прочтение уведомления",
   "notification.cleared": "Очистка прочитанного уведомления",

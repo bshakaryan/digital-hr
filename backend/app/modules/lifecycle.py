@@ -13,7 +13,7 @@ from app.database import get_db
 from app.models import Employee, LeaveCancellation, LeaveRequest, RequestCommand, RequestHistory, ZupDelivery
 from app.modules.audit import record
 from app.modules.notifications import notify
-from app.modules.requests import accessible, cancellation_block_reason, ensure_no_overlap, new_request, present
+from app.modules.requests import accessible, approval_route, cancellation_block_reason, ensure_no_overlap, final_reviewer_ids, new_request, present, review_allowed
 from app.modules.leave_balance import quote_leave
 from app.modules.zup_sync import deliver_cancellation
 from app.schemas import LeaveCalculation, LifecycleCommand, RequestCreate, RequestDecision, RequestOut, RequestReplacement
@@ -61,13 +61,13 @@ def save_command(db, user, key, digest, result_id):
         raise HTTPException(409, "Ключ команды уже использован; обновите заявку")
 
 
-def inform(db, item, user, title, comment, include_hr=False):
+def inform(db, item, user, title, comment, include_final_reviewers=False):
     owner = db.get(Employee, item.employee_id)
     recipients = {owner.id}
     if owner.manager_id:
         recipients.add(owner.manager_id)
-    if include_hr:
-        recipients.update(db.scalars(select(Employee.id).where(Employee.role == "hr_admin")))
+    if include_final_reviewers:
+        recipients.update(final_reviewer_ids(db, owner))
     for employee_id in recipients:
         notify(db, employee_id, "request_lifecycle", title, f"Заявка №{item.id} · {owner.full_name}. {comment}", entity_type="request", entity_id=item.id, actor_id=user.id)
 
@@ -97,7 +97,8 @@ def withdraw(request_id: int, data: LifecycleCommand, idempotency_key: CommandKe
         raise HTTPException(409, "Можно отозвать только ожидающую заявку")
     old_status = item.status
     transition(db, item, user, data.version, "withdrawn", data.comment)
-    inform(db, item, user, "Заявка отозвана", data.comment, old_status == "manager_approved")
+    owner = db.get(Employee, item.employee_id)
+    inform(db, item, user, "Заявка отозвана", data.comment, old_status == "manager_approved" or approval_route(owner) == "hr_to_manager")
     save_command(db, user, idempotency_key, digest, item.id)
     db.commit()
     return present(db, item, user)
@@ -117,7 +118,8 @@ def replace(request_id: int, data: RequestReplacement, idempotency_key: CommandK
     draft = RequestCreate(**data.model_dump(exclude={"version"}))
     replacement = new_request(db, user, draft, "replace-" + hashlib.sha256(f"{user.id}:{idempotency_key}".encode()).hexdigest(), hashlib.sha256(draft.model_dump_json().encode()).hexdigest())
     # Both records, histories, notifications and the replay key share one commit.
-    inform(db, item, user, "Заявка заменена", f"Новая заявка №{replacement.id}; требуется повторное согласование.", old_status == "manager_approved")
+    owner = db.get(Employee, item.employee_id)
+    inform(db, item, user, "Заявка заменена", f"Новая заявка №{replacement.id}; требуется повторное согласование.", old_status == "manager_approved" or approval_route(owner) == "hr_to_manager")
     db.add(RequestHistory(request_id=item.id, actor_id=user.id, status="withdrawn", comment=f"Создана новая заявка №{replacement.id}"))
     save_command(db, user, idempotency_key, digest, replacement.id)
     db.commit()
@@ -148,10 +150,11 @@ def cancel_decision(request_id: int, data: RequestDecision, idempotency_key: Com
     item, digest, previous = begin(db, user, request_id, idempotency_key, "cancel-decision", data)
     if previous:
         return present(db, previous, user)
-    if user.role != "hr_admin" or user.id == item.employee_id:
-        raise HTTPException(403, "Отмену подтверждает HR, кроме автора заявки")
     if item.status != "cancellation_requested":
         raise HTTPException(409, "Заявка не ожидает отмены")
+    owner = db.get(Employee, item.employee_id)
+    if not review_allowed(user, owner, item):
+        raise HTTPException(403, "Отмену подтверждает независимый согласующий, кроме автора заявки")
     if not data.comment.strip():
         raise HTTPException(422, "Укажите комментарий к решению об отмене")
     accepted = data.status == "approved"
@@ -162,8 +165,10 @@ def cancel_decision(request_id: int, data: RequestDecision, idempotency_key: Com
         original = db.scalar(select(ZupDelivery).where(ZupDelivery.request_id == item.id))
         owner = db.get(Employee, item.employee_id)
         db.add(LeaveCancellation(request_id=item.id, actor_id=user.id, command_key=f"jana-cancel-{uuid4()}", payload_json=json.dumps({"employee_id": owner.zup_id, "original_command_key": original.command_key})))
+    manager_route = approval_route(owner) == "hr_to_manager"
     transition(db, item, user, data.version, "cancelled" if accepted else "approved", data.comment,
-               "request.cancelled" if accepted else "request.cancellation_rejected")
+               ("request.cancelled_by_manager" if manager_route else "request.cancelled") if accepted else
+               ("request.cancellation_rejected_by_manager" if manager_route else "request.cancellation_rejected"))
     inform(db, item, user, "Отмена отпуска подтверждена" if accepted else "Отмена отпуска отклонена", data.comment, True)
     save_command(db, user, idempotency_key, digest, item.id)
     db.commit()

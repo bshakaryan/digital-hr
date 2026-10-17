@@ -84,7 +84,7 @@ def create_document(request_id: int, data: PrepareDocument, user: Employee = Dep
     if item.employee_id == user.id:
         raise HTTPException(403, "Нельзя отправлять собственную заявку от имени HR")
     if item.status != "approved":
-        raise HTTPException(409, "Документ доступен после финального решения HR")
+        raise HTTPException(409, "Документ доступен после финального решения по заявке")
     settings = get_settings()
     client = documentolog_client()
     # Lock the request before checking uniqueness: concurrent HR commands serialize.

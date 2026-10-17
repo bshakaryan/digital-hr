@@ -68,14 +68,53 @@ def test_employee_is_forbidden_to_approve_own_request(api):
     assert api.db.snapshot() == before
 
 
-@pytest.mark.parametrize("actor", ["manager", "hr", "outsider"])
-def test_request_without_configured_manager_is_not_created(api, actor):
+def test_employee_without_configured_manager_cannot_create_request(api):
+    actor = "outsider"
     api.headers(actor)
     before = api.db.snapshot()
     response = api.create(actor)
     assert response.status_code == 409
     assert "не настроен маршрут" in response.json()["detail"]
     assert api.db.snapshot() == before
+
+
+@pytest.mark.parametrize(
+    "author,reviewer,route,initial_status,author_id,reviewer_id,audit_action",
+    [
+        ("manager", "hr", "manager_to_hr", "manager_approved", 2, 3, "request.approved"),
+        ("hr", "manager", "hr_to_manager", "submitted", 3, 2, "request.approved_by_manager"),
+    ],
+)
+def test_manager_and_hr_requests_have_one_independent_approval_stage(
+    api, author, reviewer, route, initial_status, author_id, reviewer_id, audit_action
+):
+    from app.models import AuditEvent, LeaveDeduction, RequestHistory
+
+    initial_balance = api.get("/api/me", author).json()["leave_balance"]
+    item = api.leave(author, key=f"one-stage-{author}")
+    assert item["approval_route"] == route
+    assert item["status"] == initial_status
+    assert [entry["status"] for entry in item["history"]] == ["submitted"]
+    assert item["id"] in {row["id"] for row in api.get("/api/requests/review-queue", reviewer).json()}
+    assert api.decide(item, author).status_code == 403
+
+    response = api.decide(item, reviewer)
+    assert response.status_code == 200, response.text
+    approved = response.json()
+    assert approved["status"] == "approved"
+    assert approved["version"] == item["version"] + 1
+    assert [entry["status"] for entry in approved["history"]] == ["submitted", "approved"]
+    assert api.get("/api/me", author).json()["leave_balance"] == initial_balance - 5
+
+    with api.db.session() as db:
+        history = db.scalars(select(RequestHistory).where(RequestHistory.request_id == item["id"])).all()
+        assert [entry.actor_id for entry in history] == [author_id, reviewer_id]
+        deduction = db.scalar(select(LeaveDeduction).where(LeaveDeduction.request_id == item["id"]))
+        assert (deduction.employee_id, deduction.actor_id, deduction.days) == (author_id, reviewer_id, 5)
+        actions = set(db.scalars(select(AuditEvent.action).where(
+            AuditEvent.entity_type == "request", AuditEvent.entity_id == item["id"]
+        )))
+        assert audit_action in actions
 
 
 def test_unrelated_manager_cannot_see_or_decide_outsider_request(api):

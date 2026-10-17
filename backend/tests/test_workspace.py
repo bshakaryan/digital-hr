@@ -137,6 +137,25 @@ def test_cancellation_requires_hr_and_refunds_once(api):
     assert api.create(key="new-after-cancellation").status_code == 201
 
 
+def test_hr_leave_cancellation_is_decided_by_manager(api):
+    initial = api.get("/api/me", "hr").json()["leave_balance"]
+    item = api.decide(api.leave("hr", key="hr-one-stage"), "manager").json()
+    assert item["status"] == "approved"
+    assert api.get("/api/me", "hr").json()["leave_balance"] == initial - 5
+
+    pending = act(api, item, "cancel", "hr", key="hr-cancel-request").json()
+    assert pending["approval_route"] == "hr_to_manager"
+    assert pending["can_review"] is False
+    assert pending["id"] in {row["id"] for row in api.get("/api/requests/review-queue", "manager").json()}
+    assert act(api, pending, "cancellation-decision", "hr", key="hr-self-cancel", status="approved").status_code == 403
+
+    result = act(api, pending, "cancellation-decision", "manager", key="hr-cancel-decision", status="approved")
+    assert result.status_code == 200, result.text
+    assert result.json()["status"] == "cancelled"
+    assert result.json()["history"][-1]["actor_name"] == "Арман Демо"
+    assert api.get("/api/me", "hr").json()["leave_balance"] == initial
+
+
 def test_cancellation_rejection_keeps_accounting_and_can_be_requested_again(api):
     item = approved(api)
     pending = act(api, item, "cancel").json()

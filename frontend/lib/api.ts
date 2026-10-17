@@ -23,6 +23,7 @@ export interface LeaveRequest {
   end_date: string;
   days_count: number;
   calendar_days: number;
+  approval_route: "standard" | "manager_to_hr" | "hr_to_manager";
   can_review: boolean;
   cancellation_allowed: boolean;
   cancellation_block_reason: string | null;
