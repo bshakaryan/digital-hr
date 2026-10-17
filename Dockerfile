@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends libstdc++6 \
     && chown jana:jana /var/data /app/web
 COPY --from=frontend-dependencies /usr/local/bin/node /usr/local/bin/node
 COPY backend/ ./
+COPY --chown=jana:jana knowledge_base_docs/ /app/corpus/
 COPY --from=frontend-build --chown=jana:jana /web/.next/standalone /app/web/
 COPY --from=frontend-build --chown=jana:jana /web/.next/static /app/web/.next/static/
 COPY --from=frontend-build --chown=jana:jana /web/public /app/web/public/
