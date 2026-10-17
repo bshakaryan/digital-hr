@@ -3,7 +3,7 @@ from datetime import date
 from typing import Literal
 from urllib.parse import urlparse
 
-from pydantic import Field, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,7 +17,8 @@ class Settings(BaseSettings):
     academy_demo_as_of: date = date(2026, 10, 17)
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     llm_provider: Literal["disabled", "openai_compatible"] = "disabled"
-    llm_api_key: str | None = None
+    llm_api_key: SecretStr | None = None
+    openai_api_key: SecretStr | None = None
     llm_api_url: str = "https://api.openai.com/v1/chat/completions"
     llm_model: str = "gpt-4.1-mini"
     llm_timeout_seconds: float = Field(default=5, ge=1, le=10)

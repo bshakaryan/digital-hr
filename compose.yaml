@@ -87,6 +87,7 @@ services:
       <<: *backend_env
       LLM_PROVIDER: ${LLM_PROVIDER:-disabled}
       LLM_API_KEY: ${LLM_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       LLM_API_URL: ${LLM_API_URL:-https://api.openai.com/v1/chat/completions}
       LLM_MODEL: ${LLM_MODEL:-gpt-4.1-mini}
       LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-5}

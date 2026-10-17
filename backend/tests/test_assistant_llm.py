@@ -10,8 +10,10 @@ from app.modules.assistant_llm import generate_answer
 
 
 def settings(**changes):
-    values = {"jwt_secret": "test-only-jwt-secret-never-use-outside-pytest-2026",
-              "llm_provider": "openai_compatible", "llm_api_key": "test-provider-key"}
+    values = {"database_url": "sqlite:///test-only.sqlite3",
+              "jwt_secret": "test-only-jwt-secret-never-use-outside-pytest-2026",
+              "llm_provider": "openai_compatible", "llm_api_key": "test-provider-key",
+              "openai_api_key": None}
     values.update(changes)
     return Settings(_env_file=None, **values)
 
@@ -45,6 +47,8 @@ def test_provider_errors_and_unsafe_outputs_use_fallback():
     for response in (
         httpx.Response(503),
         httpx.Response(200, json=completion("Посмотрите https://example.com.")),
+        httpx.Response(200, json=completion("Посмотрите example.com.")),
+        httpx.Response(200, json=completion("Посмотрите example.xyz.")),
         httpx.Response(200, json=completion("Отпуск длится 999 дней.")),
         httpx.Response(200, json=completion("Заявка одобрена.")),
         httpx.Response(200, json=completion("Заявку на отпуск можно отправить", "length")),
@@ -54,6 +58,9 @@ def test_provider_errors_and_unsafe_outputs_use_fallback():
         assert result is None
     assert generate_answer("Как отправить отпускную заявку?", passage,
                            settings(llm_api_key=None)) is None
+    assert generate_answer("Как отправить отпускную заявку?", passage,
+                           settings(llm_api_key=None, openai_api_key="test-provider-key"),
+                           transport=httpx.MockTransport(lambda _: httpx.Response(200, json=completion("NO_EVIDENCE")))) == "NO_EVIDENCE"
     assert generate_answer("Как отправить отпускную заявку?", passage, settings(),
                            transport=httpx.MockTransport(lambda _: httpx.Response(200, json=completion("NO_EVIDENCE")))) == "NO_EVIDENCE"
 
