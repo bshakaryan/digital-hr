@@ -1,4 +1,4 @@
-"""HTTP scenarios on migrated SQLite, or isolated PostgreSQL schemas.
+"""HTTP scenarios on migrated, isolated PostgreSQL schemas.
 
 No create_all, production secrets, or mutation of persistent application tables.
 App imports happen only after the test environment has been installed.
@@ -14,7 +14,6 @@ from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select, text
-from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
 
@@ -24,26 +23,54 @@ TEST_SECRET = "test-only-jwt-secret-never-use-outside-pytest-2026"
 
 
 @pytest.fixture
-def database(monkeypatch, tmp_path):
-    postgres_admin = None
-    schema = None
-    if os.environ.get("POSTGRES_TEST") == "1":
-        source_url = make_url(os.environ["DATABASE_URL"])
-        if source_url.get_backend_name() != "postgresql":
-            raise ValueError("POSTGRES_TEST requires a PostgreSQL DATABASE_URL")
-        schema = "jana_test_" + uuid4().hex
-        postgres_admin = create_engine(source_url)
+def postgres_schema(monkeypatch):
+    from app.config import get_settings, postgres_database_url
+    from app.database import get_engine
+    from sqlalchemy.engine import make_url
+
+    configured = os.environ.get("TEST_DATABASE_URL") or os.environ.get("DATABASE_URL")
+    if not configured:
+        pytest.fail("Set TEST_DATABASE_URL (or DATABASE_URL) to PostgreSQL, or run tests inside Docker Compose")
+    source_url = make_url(postgres_database_url(configured))
+    schema = "jana_test_" + uuid4().hex
+    postgres_admin = create_engine(source_url)
+    created = False
+    try:
         with postgres_admin.begin() as connection:
             connection.execute(text(f'CREATE SCHEMA "{schema}"'))
+        created = True
+        # No public fallback: application tables outside this schema are invisible.
         scenario_url = source_url.update_query_dict({"options": f"-csearch_path={schema}"}).render_as_string(hide_password=False)
-    else:
-        scenario_url = f"sqlite:///{tmp_path / 'scenario.sqlite3'}"
-    monkeypatch.setenv("DATABASE_URL", scenario_url)
-    monkeypatch.setenv("JWT_SECRET", TEST_SECRET)
-    monkeypatch.setenv("DEMO_PASSWORD", TEST_PASSWORD)
-    monkeypatch.setenv("ZUP_API_TOKEN", TEST_SECRET)
-    monkeypatch.setenv("DOCUMENTOLOG_MODE", "disabled")
+        monkeypatch.setenv("DATABASE_URL", scenario_url)
+        monkeypatch.setenv("JWT_SECRET", TEST_SECRET)
+        monkeypatch.setenv("DEMO_PASSWORD", TEST_PASSWORD)
+        monkeypatch.setenv("ZUP_API_TOKEN", TEST_SECRET)
+        monkeypatch.setenv("ZUP_MODE", "mock")
+        monkeypatch.setenv("DOCUMENTOLOG_MODE", "disabled")
+        if get_engine.cache_info().currsize:
+            get_engine().dispose()
+        get_engine.cache_clear()
+        get_settings.cache_clear()
+        engine = create_engine(scenario_url)
+        try:
+            yield SimpleNamespace(engine=engine, url=scenario_url, config=Config(str(BACKEND / "alembic.ini")))
+        finally:
+            engine.dispose()
+    finally:
+        if get_engine.cache_info().currsize:
+            get_engine().dispose()
+        get_engine.cache_clear()
+        get_settings.cache_clear()
+        try:
+            if created:
+                with postgres_admin.begin() as connection:
+                    connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
+        finally:
+            postgres_admin.dispose()
 
+
+@pytest.fixture
+def database(monkeypatch, tmp_path, postgres_schema):
     from app.config import get_settings
     from app.database import Base, get_engine
     from app.seed import seed
@@ -66,7 +93,7 @@ def database(monkeypatch, tmp_path):
         get_engine().dispose()
     get_engine.cache_clear()
     get_settings.cache_clear()
-    config = Config(str(BACKEND / "alembic.ini"))
+    config = postgres_schema.config
     try:
         command.upgrade(config, "head")
         seed()
@@ -98,11 +125,6 @@ def database(monkeypatch, tmp_path):
             get_engine().dispose()
         get_engine.cache_clear()
         get_settings.cache_clear()
-
-        if postgres_admin is not None:
-            with postgres_admin.begin() as connection:
-                connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
-            postgres_admin.dispose()
 
 
 class Scenario:

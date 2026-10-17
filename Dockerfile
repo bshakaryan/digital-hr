@@ -1,4 +1,4 @@
-# Single-service demo deployment (Render and other Docker web hosts).
+# Single web-container demo with an external PostgreSQL database.
 # The existing compose.yaml continues to run separate services with PostgreSQL.
 FROM node:22-bookworm-slim AS frontend-dependencies
 WORKDIR /web

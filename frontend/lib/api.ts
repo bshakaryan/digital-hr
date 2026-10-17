@@ -14,6 +14,12 @@ export interface Profile {
 }
 
 export type RequestStatus = "submitted" | "manager_approved" | "approved" | "rejected" | "withdrawn" | "cancellation_requested" | "cancelled";
+export interface SharedCalendar {
+  month: string;
+  employees: { id: number; full_name: string; department: string; can_open_profile: boolean }[];
+  absences: { id: number; employee_id: number; start_date: string; end_date: string;
+    status: "submitted" | "manager_approved" | "approved" | "cancellation_requested"; can_open_request: boolean }[];
+}
 export interface LeaveRequest {
   id: number;
   employee_id: number;

@@ -1,5 +1,4 @@
 from concurrent.futures import ThreadPoolExecutor
-import os
 from threading import Barrier
 
 import pytest
@@ -289,7 +288,6 @@ def test_workspace_migration_preserves_populated_0005(database):
     command.check(database.config)
 
 
-@pytest.mark.skipif(os.environ.get("POSTGRES_TEST") != "1", reason="Requires PostgreSQL row locks")
 def test_concurrent_cancellation_decisions_create_one_refund(api):
     pending = act(api, approved(api), "cancel").json()
     api.headers("hr")
@@ -303,7 +301,6 @@ def test_concurrent_cancellation_decisions_create_one_refund(api):
     assert len(api.db.snapshot("leave_cancellations")["leave_cancellations"]) == 1
 
 
-@pytest.mark.skipif(os.environ.get("POSTGRES_TEST") != "1", reason="Requires PostgreSQL row locks")
 def test_concurrent_identical_cancellation_commands_replay_success(api):
     pending = act(api, approved(api), "cancel").json()
     api.headers("hr")

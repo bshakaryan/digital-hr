@@ -182,7 +182,7 @@ def test_real_client_uses_published_path_and_no_assumed_idempotency():
 
 def test_real_settings_require_https_and_sender():
     from app.config import Settings
-    fields = {"_env_file": None, "database_url": "sqlite:///:memory:", "jwt_secret": "test-settings-secret-at-least-32-chars", "documentolog_mode": "real", "documentolog_api_key": "x" * 32,
+    fields = {"_env_file": None, "database_url": "postgresql+psycopg://user@localhost/settings_test", "jwt_secret": "test-settings-secret-at-least-32-chars", "zup_mode": "mock", "documentolog_mode": "real", "documentolog_api_key": "x" * 32,
         "documentolog_base_url": "https://apibusiness.documentolog.com", "documentolog_browser_url": "https://apibusiness.documentolog.com",
         "documentolog_public_url": "https://hr.test", "documentolog_callback_url": "https://hr.test", "documentolog_sender": "000000000000"}
     assert Settings(**fields).documentolog_mode == "real"
@@ -246,8 +246,6 @@ def test_real_completion_is_only_reported_not_verified(api, docs):
 
 def test_concurrent_hr_commands_create_one_external_document(api, docs):
     from concurrent.futures import ThreadPoolExecutor
-    if api.db.engine.dialect.name != "postgresql":
-        pytest.skip("Requires PostgreSQL row locking")
     client, path = docs
     item = approved(api)
     api.headers("hr")

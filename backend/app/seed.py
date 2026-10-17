@@ -3,7 +3,7 @@ import json
 from dataclasses import asdict
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -24,6 +24,9 @@ def seed():
     if not password:
         raise SystemExit("Задайте DEMO_PASSWORD (минимум 12 символов). Seed не изменяет существующие пароли.")
     with Session(get_engine()) as db:
+        # Fixed demo IDs must coexist with PostgreSQL-generated IDs. Serialize
+        # provisioning with inserts while repairing their sequence high-water marks.
+        db.execute(text("LOCK TABLE employees, courses, knowledge_documents IN SHARE ROW EXCLUSIVE MODE"))
         # Managers must exist before inserting direct reports (FK enabled).
         snapshots = zup_adapter().employees()
         for snapshot in sorted(snapshots, key=lambda e: e.manager_id is not None):
@@ -98,6 +101,14 @@ def seed():
                     db.add(RequestHistory(request_id=request.id, actor_id=2, status=status, comment="Отклонено руководителем"))
                     record(db, 2, f"request.{status}", "request", request.id)
                     notify(db, 1, "request_status", "Демонстрационное решение по заявке", f"Заявка №{request.id}: {status}", entity_type="request", entity_id=request.id, actor_id=2)
+        db.flush()
+        for table in ("employees", "courses", "knowledge_documents"):
+            db.execute(text(f"""
+                SELECT setval(pg_get_serial_sequence('{table}', 'id'),
+                    GREATEST(COALESCE((SELECT MAX(id) FROM {table}), 1),
+                             (SELECT last_value FROM {table}_id_seq)),
+                    (SELECT is_called FROM {table}_id_seq) OR EXISTS (SELECT 1 FROM {table}))
+            """))
         db.commit()
     print("Демо-данные готовы. Существующие записи и пароли сохранены.")
 

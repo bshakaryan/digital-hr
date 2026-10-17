@@ -15,10 +15,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build and start the complete stack
         run: ./scripts/docker-up.sh
-      - name: Backend regression tests (isolated SQLite)
+      - name: Full backend regression and concurrency (isolated PostgreSQL schemas)
         run: docker compose exec -T backend python -m pytest -q
-      - name: Leave integration and concurrency (isolated PostgreSQL schemas)
-        run: docker compose exec -T -e POSTGRES_TEST=1 backend python -m pytest -q tests/test_zup.py tests/test_requests.py tests/test_persistence.py tests/test_documentolog.py tests/test_workspace.py
+      - name: Assistant evaluation (isolated PostgreSQL schema)
+        run: docker compose exec -T backend python -m eval.evaluate_assistant
       - name: Smoke test through frontend and PostgreSQL persistence
         run: docker compose exec -T backend python - < scripts/compose_smoke.py
       - name: Restart with the existing database
@@ -32,3 +32,57 @@ jobs:
       - name: Stop containers
         if: always()
         run: docker compose down
+
+  single-web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      JWT_SECRET: ci-only-web-jwt-secret-never-use-outside-ci-2026
+      DEMO_PASSWORD: ci-only-web-demo-password-2026
+      ZUP_API_TOKEN: ci-only-web-jwt-secret-never-use-outside-ci-2026
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: jana
+          POSTGRES_DB: jana
+          POSTGRES_PASSWORD: ci-only-postgres-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U jana -d jana"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the root web image
+        run: docker build -t digital-hr-web:ci .
+      - name: Start with external PostgreSQL and verify persistence across restart
+        run: |
+          docker run -d --name digital-hr-web-ci --network host \
+            -e DATABASE_URL=postgresql://jana:ci-only-postgres-password@127.0.0.1:5432/jana \
+            -e JWT_SECRET -e DEMO_PASSWORD -e ZUP_API_TOKEN \
+            -e PORT=10000 -e RENDER_EXTERNAL_URL=http://localhost:10000 \
+            -v digital_hr_web_ci_mocks:/var/data digital-hr-web:ci
+          wait_web() {
+            for attempt in $(seq 1 60); do
+              if curl --silent --fail http://localhost:10000/api/health >/dev/null; then
+                return 0
+              fi
+              sleep 1
+            done
+            docker logs digital-hr-web-ci
+            return 1
+          }
+          wait_web
+          docker exec -i -e API_BASE_URL=http://127.0.0.1:10000/api digital-hr-web-ci python - < scripts/compose_smoke.py
+          docker restart digital-hr-web-ci
+          wait_web
+          docker exec -i -e API_BASE_URL=http://127.0.0.1:10000/api digital-hr-web-ci python - < scripts/compose_smoke.py
+      - name: Diagnostics
+        if: failure()
+        run: docker logs digital-hr-web-ci
+      - name: Stop the web container
+        if: always()
+        run: docker rm -f digital-hr-web-ci
