@@ -1,0 +1,621 @@
+{
+  "summary": {
+    "cases": 30,
+    "supported": 24,
+    "unanswerable": 4,
+    "unauthorized": 2,
+    "hit_any": 9,
+    "hit_all": 7,
+    "unanswerable_refused": 3,
+    "unauthorized_refused": 0,
+    "answered": 26,
+    "citation_resolves": 26,
+    "access_checks": {
+      "employee_old_public": 200,
+      "employee_old_restricted": 404,
+      "hr_old_restricted": 200,
+      "employee_new_restricted": 404,
+      "manager_new_restricted": 404,
+      "hr_new_restricted": 200
+    }
+  },
+  "results": [
+    {
+      "id": "Q01",
+      "type": "direct",
+      "role": "employee",
+      "expected_outcome": "supported",
+      "expected_support": [
+        "HR-01 §1.1"
+      ],
+      "status": 200,
+      "answer": "По демонстрационной базе: В прототипе откройте «Заявки», выберите даты и отправьте заявку. Только финальное одобрение списывает дни; ожидающие и отклонённые заявки не меняют остаток. [1]",
+      "cited_sections": [],
+      "source_ids": [
+        1
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": false,
+      "hit_all": false
+    },
+    {
+      "id": "Q02",
+      "type": "paraphrase",
+      "role": "employee",
+      "expected_outcome": "supported",
+      "expected_support": [
+        "HR-01 §1.1",
+        "HR-01 §2.1"
+      ],
+      "status": 200,
+      "answer": "По демонстрационной базе: В прототипе откройте «Заявки», выберите даты и отправьте заявку. Период рассчитывает HTTP mock 1С:ЗУП: календарные дни включительно без национальных и государственных праздничных дат Казахстана; обычные и перенесённые выходные учитываются. [1]",
+      "cited_sections": [],
+      "source_ids": [
+        1
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": false,
+      "hit_all": false
+    },
+    {
+      "id": "Q03",
+      "type": "direct",
+      "role": "employee",
+      "expected_outcome": "supported",
+      "expected_support": [
+        "HR-01 §2.1"
+      ],
+      "status": 200,
+      "answer": "По демонстрационной базе: Статус approved означает решение HR в Digital HR. Не следует трактовать approved как доказательство успешной внешней синхронизации. [1]",
+      "cited_sections": [
+        "HR-01 §2.2"
+      ],
+      "source_ids": [
+        1104
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": false,
+      "hit_all": false
+    },
+    {
+      "id": "Q04",
+      "type": "distinction",
+      "role": "employee",
+      "expected_outcome": "supported",
+      "expected_support": [
+        "HR-01 §2.2"
+      ],
+      "status": 200,
+      "answer": "По демонстрационной базе: Функция действует только в mock-режиме при наличии исходной команды передачи и отсутствии сохранённого документа Documentolog. Начавшийся отпуск, частичная отмена и историческое одобрение без команды источника не поддерживаются. [1]",
+      "cited_sections": [
+        "HR-01 §4.2"
+      ],
+      "source_ids": [
+        1107
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": false,
+      "hit_all": false
+    },
+    {
+      "id": "Q05",
+      "type": "multi_section",
+      "role": "employee",
+      "expected_outcome": "supported",
+      "expected_support": [
+        "HR-01 §3.1",
+        "HR-01 §2.1"
+      ],
+      "status": 200,
+      "answer": "По демонстрационной базе: После согласования руководителем HR может принять финальное решение: approved или rejected. Руководитель не принимает финальное решение за HR; автор не согласовывает собственную заявку. [1]",
+      "cited_sections": [
+        "HR-01 §2.1"
+      ],
+      "source_ids": [
+        1103
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": true,
+      "hit_all": false
+    },
+    {
+      "id": "Q06",
+      "type": "direct",
+      "role": "employee",
+      "expected_outcome": "supported",
+      "expected_support": [
+        "HR-01 §4.1"
+      ],
+      "status": 200,
+      "answer": "По демонстрационной базе: Для изменения дат в таком состоянии создаётся новая заявка, а прежняя становится withdrawn; новая проходит оба этапа согласования заново. Старые даты и история сохраняются. [1]",
+      "cited_sections": [
+        "HR-01 §4.1"
+      ],
+      "source_ids": [
+        1106
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": true,
+      "hit_all": true
+    },
+    {
+      "id": "Q07",
+      "type": "distinction",
+      "role": "employee",
+      "expected_outcome": "supported",
+      "expected_support": [
+        "HR-01 §1.2",
+        "HR-01 §2.1"
+      ],
+      "status": 200,
+      "answer": "По демонстрационной базе: Автор может отозвать заявку со статусом submitted или manager_approved, указав причину. Для изменения дат в таком состоянии создаётся новая заявка, а прежняя становится withdrawn; новая проходит оба этапа согласования заново. [1]",
+      "cited_sections": [
+        "HR-01 §4.1"
+      ],
+      "source_ids": [
+        1106
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": false,
+      "hit_all": false
+    },
+    {
+      "id": "Q08",
+      "type": "unanswerable",
+      "role": "employee",
+      "expected_outcome": "no_supported_answer",
+      "expected_support": [],
+      "status": 200,
+      "answer": "В демонстрационной базе нет надёжного ответа на этот вопрос. Обратитесь в HR. Я не получаю персональные данные сотрудников и не принимаю кадровые решения.",
+      "cited_sections": [],
+      "source_ids": [],
+      "refused": true,
+      "citation_resolves": null,
+      "hit_any": null,
+      "hit_all": null
+    },
+    {
+      "id": "Q09",
+      "type": "unanswerable",
+      "role": "employee",
+      "expected_outcome": "no_supported_answer",
+      "expected_support": [],
+      "status": 200,
+      "answer": "В демонстрационной базе нет надёжного ответа на этот вопрос. Обратитесь в HR. Я не получаю персональные данные сотрудников и не принимаю кадровые решения.",
+      "cited_sections": [],
+      "source_ids": [],
+      "refused": true,
+      "citation_resolves": null,
+      "hit_any": null,
+      "hit_all": null
+    },
+    {
+      "id": "Q10",
+      "type": "direct",
+      "role": "employee",
+      "expected_outcome": "supported",
+      "expected_support": [
+        "HR-02 §1.1"
+      ],
+      "status": 200,
+      "answer": "По демонстрационной базе: Кадровые поля профиля в прототипе доступны только для чтения. Для исправления реальных данных необходимо обратиться в HR; реальная интеграция пока не подключена. [1]",
+      "cited_sections": [],
+      "source_ids": [
+        3
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": false,
+      "hit_all": false
+    },
+    {
+      "id": "Q11",
+      "type": "paraphrase",
+      "role": "employee",
+      "expected_outcome": "supported",
+      "expected_support": [
+        "HR-02 §1.1"
+      ],
+      "status": 200,
+      "answer": "По демонстрационной базе: DEMO / SYNTHETIC. Для будущего approved-запроса автор может предложить полную отмену; решение по ней принимает HR. [1]",
+      "cited_sections": [
+        "HR-01 §4.2"
+      ],
+      "source_ids": [
+        1107
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": false,
+      "hit_all": false
+    },
+    {
+      "id": "Q12",
+      "type": "distinction",
+      "role": "employee",
+      "expected_outcome": "supported",
+      "expected_support": [
+        "HR-02 §1.2"
+      ],
+      "status": 200,
+      "answer": "В демонстрационной базе нет надёжного ответа на этот вопрос. Обратитесь в HR. Я не получаю персональные данные сотрудников и не принимаю кадровые решения.",
+      "cited_sections": [],
+      "source_ids": [],
+      "refused": true,
+      "citation_resolves": null,
+      "hit_any": false,
+      "hit_all": false
+    },
+    {
+      "id": "Q13",
+      "type": "multi_section",
+      "role": "employee",
+      "expected_outcome": "supported",
+      "expected_support": [
+        "HR-02 §2.1",
+        "HR-02 §3.1"
+      ],
+      "status": 200,
+      "answer": "По демонстрационной базе: Назначенные курсы находятся в разделе Academy. После правильного ответа курс отмечается завершённым и появляется уведомление. [1]",
+      "cited_sections": [],
+      "source_ids": [
+        2
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": false,
+      "hit_all": false
+    },
+    {
+      "id": "Q14",
+      "type": "direct",
+      "role": "employee",
+      "expected_outcome": "supported",
+      "expected_support": [
+        "LMS-01 §1.1"
+      ],
+      "status": 200,
+      "answer": "По демонстрационной базе: Назначенные курсы находятся в разделе Academy. Прочитайте материал, отметьте прогресс и ответьте на контрольный вопрос. [1]",
+      "cited_sections": [],
+      "source_ids": [
+        2
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": false,
+      "hit_all": false
+    },
+    {
+      "id": "Q15",
+      "type": "direct",
+      "role": "employee",
+      "expected_outcome": "supported",
+      "expected_support": [
+        "LMS-01 §2.1",
+        "LMS-01 §2.2"
+      ],
+      "status": 200,
+      "answer": "По демонстрационной базе: После чтения материала интерфейс отправляет процент прогресса на backend. До успешного теста сервер ограничивает сохранённый прогресс значением 99, даже если клиент передал 100. [1]",
+      "cited_sections": [
+        "LMS-01 §2.1"
+      ],
+      "source_ids": [
+        1302
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": true,
+      "hit_all": false
+    },
+    {
+      "id": "Q16",
+      "type": "paraphrase",
+      "role": "employee",
+      "expected_outcome": "supported",
+      "expected_support": [
+        "LMS-01 §2.2"
+      ],
+      "status": 200,
+      "answer": "По демонстрационной базе: Прочитайте материал, отметьте прогресс и ответьте на контрольный вопрос. После правильного ответа курс отмечается завершённым и появляется уведомление. [1]",
+      "cited_sections": [],
+      "source_ids": [
+        2
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": false,
+      "hit_all": false
+    },
+    {
+      "id": "Q17",
+      "type": "direct",
+      "role": "employee",
+      "expected_outcome": "supported",
+      "expected_support": [
+        "LMS-01 §2.2",
+        "LMS-01 §3.1"
+      ],
+      "status": 200,
+      "answer": "По демонстрационной базе: Карточка курса содержит название, описание, учебный текст, ориентировочную длительность, прогресс и один контрольный вопрос с вариантами ответа. В системе нет подтверждённого интерфейса самостоятельного выбора курса, сложной программы уроков или редактора курсов. [1]",
+      "cited_sections": [
+        "LMS-01 §1.1"
+      ],
+      "source_ids": [
+        1301
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": false,
+      "hit_all": false
+    },
+    {
+      "id": "Q18",
+      "type": "direct",
+      "role": "employee",
+      "expected_outcome": "supported",
+      "expected_support": [
+        "LMS-01 §3.1"
+      ],
+      "status": 200,
+      "answer": "По демонстрационной базе: Сервер вычисляет 100 XP за каждое уникальное завершённое назначение курса. Достижение «Первый курс» появляется после одного завершения, «Три курса» — после трёх. [1]",
+      "cited_sections": [
+        "LMS-01 §3.1"
+      ],
+      "source_ids": [
+        1304
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": true,
+      "hit_all": true
+    },
+    {
+      "id": "Q19",
+      "type": "distinction",
+      "role": "employee",
+      "expected_outcome": "supported",
+      "expected_support": [
+        "LMS-01 §2.1",
+        "LMS-01 §2.2"
+      ],
+      "status": 200,
+      "answer": "По демонстрационной базе: Назначенные курсы находятся в разделе Academy. Прочитайте материал, отметьте прогресс и ответьте на контрольный вопрос. [1]",
+      "cited_sections": [],
+      "source_ids": [
+        2
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": false,
+      "hit_all": false
+    },
+    {
+      "id": "Q20",
+      "type": "unanswerable",
+      "role": "employee",
+      "expected_outcome": "no_supported_answer",
+      "expected_support": [],
+      "status": 200,
+      "answer": "В демонстрационной базе нет надёжного ответа на этот вопрос. Обратитесь в HR. Я не получаю персональные данные сотрудников и не принимаю кадровые решения.",
+      "cited_sections": [],
+      "source_ids": [],
+      "refused": true,
+      "citation_resolves": null,
+      "hit_any": null,
+      "hit_all": null
+    },
+    {
+      "id": "Q21",
+      "type": "direct",
+      "role": "employee",
+      "expected_outcome": "supported",
+      "expected_support": [
+        "LOG-01 §1.1"
+      ],
+      "status": 200,
+      "answer": "По демонстрационной базе: GS1 относит разгрузку, инспекцию и подтверждение приёмки к процессу управления доставкой. Приёмка посылки и обещание доставить её получателю — разные события. [1]",
+      "cited_sections": [
+        "LOG-01 §1.1"
+      ],
+      "source_ids": [
+        1401
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": true,
+      "hit_all": true
+    },
+    {
+      "id": "Q22",
+      "type": "paraphrase",
+      "role": "employee",
+      "expected_outcome": "supported",
+      "expected_support": [
+        "LOG-01 §1.2",
+        "LOG-01 §2.1"
+      ],
+      "status": 200,
+      "answer": "По демонстрационной базе: В вымышленном учебном центре посылка JP-DEMO-001 прибыла с читаемым кодом, но её внешняя коробка смята. Этот пример не устанавливает решение о годности отправления, срок обработки или реальный порядок Jana Post. [1]",
+      "cited_sections": [
+        "LOG-01 §4.1"
+      ],
+      "source_ids": [
+        1406
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": false,
+      "hit_all": false
+    },
+    {
+      "id": "Q23",
+      "type": "distinction",
+      "role": "employee",
+      "expected_outcome": "supported",
+      "expected_support": [
+        "LOG-01 §2.1"
+      ],
+      "status": 200,
+      "answer": "По демонстрационной базе: При сортировке единицы группируют по следующему маршруту или месту обработки. Сортировка — выбор следующего направления обработки; хранение — удержание единицы в определённом месте до следующего действия. [1]",
+      "cited_sections": [
+        "LOG-01 §2.1"
+      ],
+      "source_ids": [
+        1403
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": true,
+      "hit_all": true
+    },
+    {
+      "id": "Q24",
+      "type": "direct",
+      "role": "employee",
+      "expected_outcome": "supported",
+      "expected_support": [
+        "LOG-01 §3.1"
+      ],
+      "status": 200,
+      "answer": "По демонстрационной базе: Устойчивое размещение грузов, свободные проходы и соблюдение допустимой нагрузки стеллажей снижают риск травм и повреждения имущества. OSHA описывает эти риски и общие меры для складов; этот источник не является казахстанской или внутренней инструкцией Jana Post. [1]",
+      "cited_sections": [
+        "LOG-01 §3.1"
+      ],
+      "source_ids": [
+        1404
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": true,
+      "hit_all": true
+    },
+    {
+      "id": "Q25",
+      "type": "restricted",
+      "role": "employee",
+      "expected_outcome": "no_authorized_answer",
+      "expected_support": [],
+      "status": 200,
+      "answer": "По демонстрационной базе: DEMO / SYNTHETIC. В вымышленном учебном центре посылка JP-DEMO-001 прибыла с читаемым кодом, но её внешняя коробка смята. [1]",
+      "cited_sections": [
+        "LOG-01 §4.1"
+      ],
+      "source_ids": [
+        1406
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": null,
+      "hit_all": null
+    },
+    {
+      "id": "Q26",
+      "type": "restricted",
+      "role": "manager",
+      "expected_outcome": "no_authorized_answer",
+      "expected_support": [],
+      "status": 200,
+      "answer": "По демонстрационной базе: Статус approved означает решение HR в Digital HR. Поле zup_sync_status показывает отдельное состояние доставки команды в mock 1С:ЗУП: pending, synced или error; у исторических записей возможен legacy. [1]",
+      "cited_sections": [
+        "HR-01 §2.2"
+      ],
+      "source_ids": [
+        1104
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": null,
+      "hit_all": null
+    },
+    {
+      "id": "Q27",
+      "type": "restricted",
+      "role": "hr_admin",
+      "expected_outcome": "supported",
+      "expected_support": [
+        "LOG-02 §2.2"
+      ],
+      "status": 200,
+      "answer": "По демонстрационной базе: Статус посылки относится к отдельному отправлению. Статус перевозки может относиться к партии или транспортной операции. [1]",
+      "cited_sections": [
+        "LOG-02 §2.2"
+      ],
+      "source_ids": [
+        1504
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": true,
+      "hit_all": true
+    },
+    {
+      "id": "Q28",
+      "type": "multi_section",
+      "role": "hr_admin",
+      "expected_outcome": "supported",
+      "expected_support": [
+        "LOG-02 §1.1",
+        "LOG-02 §3.1"
+      ],
+      "status": 200,
+      "answer": "По демонстрационной базе: Статус посылки относится к отдельному отправлению. Несколько посылок могут разделять одну транспортную запись, но иметь разные индивидуальные исходы. [1]",
+      "cited_sections": [
+        "LOG-02 §2.2"
+      ],
+      "source_ids": [
+        1504
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": false,
+      "hit_all": false
+    },
+    {
+      "id": "Q29",
+      "type": "direct",
+      "role": "hr_admin",
+      "expected_outcome": "supported",
+      "expected_support": [
+        "LOG-02 §2.1"
+      ],
+      "status": 200,
+      "answer": "По демонстрационной базе: DEMO / SYNTHETIC. Смена ответственного участка называется передачей или handoff. [1]",
+      "cited_sections": [
+        "LOG-02 §2.1"
+      ],
+      "source_ids": [
+        1503
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": true,
+      "hit_all": true
+    },
+    {
+      "id": "Q30",
+      "type": "unanswerable",
+      "role": "hr_admin",
+      "expected_outcome": "no_supported_answer",
+      "expected_support": [],
+      "status": 200,
+      "answer": "По демонстрационной базе: Для вымышленной посылки JP-DEMO-001 учебная лента может выглядеть так: «принята» → «прибыла на сортировку» → «передана перевозчику» → «доставлена в пункт выдачи» → «вручена». Слова в кавычках — придуманные учебные метки, не коды, SLA или реальные статусы Jana Post. [1]",
+      "cited_sections": [
+        "LOG-02 §4.1"
+      ],
+      "source_ids": [
+        1506
+      ],
+      "refused": false,
+      "citation_resolves": true,
+      "hit_any": null,
+      "hit_all": null
+    }
+  ]
+}

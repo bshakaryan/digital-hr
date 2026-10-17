@@ -42,6 +42,7 @@ def evaluation_client():
         with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {
             "DATABASE_URL": scenario_url, "JWT_SECRET": secret, "ZUP_API_TOKEN": secret,
             "DEMO_PASSWORD": "evaluation-only-password-2026", "ZUP_MODE": "mock", "DOCUMENTOLOG_MODE": "disabled",
+            "LLM_PROVIDER": "disabled", "LLM_API_KEY": "", "OPENAI_API_KEY": "",
         }):
             get_settings.cache_clear()
             from app.mock_zup import create_mock_app

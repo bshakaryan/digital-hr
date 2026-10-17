@@ -132,13 +132,10 @@ def test_hr_private_knowledge_is_filtered_before_retrieval(api):
 
 
 def test_course_assistant_uses_only_assigned_material(api):
-    course = api.get("/api/courses/1").json()
     answer = api.post("/api/courses/1/ask", {"question": "Где увидеть решение по заявке?"})
     assert answer.status_code == 200
     result = answer.json()
-    assert result["sources"] == [{"document_id": 1, "title": course["title"],
-                                   "section": "Материал курса", "content": course["content"], "source_type": "course"}]
-    assert result["answer"].endswith("[1]")
+    assert result["sources"] == [] and result["escalate_to_hr"]
     refused = api.post("/api/courses/1/ask", {"question": "Какая сегодня погода?"}).json()
     assert refused["sources"] == [] and refused["escalate_to_hr"]
     unsupported = api.post("/api/courses/1/ask", {"question": "Какой срок курса?"}).json()
@@ -153,7 +150,9 @@ def test_course_assistant_uses_only_assigned_material(api):
         db.add(CourseAssignment(employee_id=3, course_id=private_id))
         db.commit()
     assert api.post(f"/api/courses/{private_id}/ask", {"question": "Что в секретном материале?"}).status_code == 404
-    assert api.post(f"/api/courses/{private_id}/ask", {"question": "Что в секретном материале?"}, "hr").status_code == 200
+    private_answer = api.post(f"/api/courses/{private_id}/ask", {"question": "Что в секретном материале?"}, "hr")
+    assert private_answer.status_code == 200
+    assert private_answer.json()["sources"] == []
 
 
 def test_assistant_and_rewards_require_login(api):

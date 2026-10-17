@@ -47,6 +47,9 @@ def postgres_schema(monkeypatch):
         monkeypatch.setenv("ZUP_API_TOKEN", TEST_SECRET)
         monkeypatch.setenv("ZUP_MODE", "mock")
         monkeypatch.setenv("DOCUMENTOLOG_MODE", "disabled")
+        monkeypatch.setenv("LLM_PROVIDER", "disabled")
+        monkeypatch.delenv("LLM_API_KEY", raising=False)
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         if get_engine.cache_info().currsize:
             get_engine().dispose()
         get_engine.cache_clear()

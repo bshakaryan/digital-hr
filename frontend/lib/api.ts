@@ -59,9 +59,53 @@ export interface Notification {
 export interface Course {
   id: number; title: string; description: string; content: string; duration_minutes: number;
   progress: number; completed: boolean; question: string; options: string[];
+  objectives: string; status: "draft" | "published"; category: CourseCategory; is_demo: boolean;
+  deadline: string | null; learning_status: LearningStatus; overdue: boolean;
+}
+export type CourseCategory = "general" | "onboarding" | "logistics" | "warehouse_safety" | "customer_service";
+export type LearningStatus = "completed" | "in_progress" | "not_started";
+export interface PublicCourse {
+  id: number; title: string; description: string; objectives: string;
+  duration_minutes: number; category: CourseCategory; is_demo: boolean;
 }
 export interface AcademyRewards { xp: number; level: number; next_level_xp: number; badges: string[] }
-export interface Knowledge { document_id: number; title: string; section: string; content: string }
+export interface Knowledge {
+  document_id: number; title: string; section: string; content: string;
+  file_id?: number; source_filename?: string; page_number?: number;
+  document_code?: string; version?: string; language?: string;
+  classification?: "synthetic_demo" | "external_legal_snapshot" | "external_reference";
+  source_note?: string;
+}
+export interface KnowledgeFile {
+  id: number; filename: string; title: string; document_code: string | null;
+  version: string; language: string; classification: "synthetic_demo" | "external_legal_snapshot" | "external_reference";
+  source_note: string; access_scope: "all" | "employee" | "manager" | "hr_admin";
+  sha256: string; size_bytes: number; chunk_count: number; duplicate: boolean;
+}
+export interface CourseCatalogItem {
+  id: number; title: string; description: string; objectives: string; duration_minutes: number;
+  status: "draft" | "published"; question: string; options: string[]; correct_index: number;
+  category: CourseCategory; is_demo: boolean;
+}
+export interface LearningAssignment {
+  employee_id: number; employee_name: string; department: string; course_id: number; course_title: string;
+  category: CourseCategory; progress: number; deadline: string | null; status: LearningStatus;
+  overdue: boolean; completed_at: string | null; last_activity_at: string | null;
+}
+export interface EmployeeLearning {
+  employee_id: number; employee_name: string; department: string; position: string; manager_name: string | null;
+  total_assigned: number; completed: number; in_progress: number; not_started: number; overdue: number;
+  completion_rate: number; xp: number; level: number; badges: string[]; assignments: LearningAssignment[];
+}
+export interface LearningAnalytics {
+  as_of: string; total_demo_employees: number; published_courses: number; total_assignments: number;
+  completion_rate: number; overdue_assignments: number;
+  status_counts: Record<LearningStatus, number>;
+  course_completion: { course_id: number; course_title: string; total: number; completed: number; rate: number }[];
+  daily_activity: { date: string; count: number }[];
+  overdue_by_department: { department: string; count: number }[];
+  assignments: LearningAssignment[]; employees: EmployeeLearning[];
+}
 export interface AssistantAnswer {
   answer: string; sources: Knowledge[]; escalate_to_hr: boolean; mode: "extractive_demo";
 }
@@ -92,7 +136,7 @@ export class ApiClient {
   async call<T>(path: string, options: RequestInit = {}): Promise<T> {
     const headers = new Headers(options.headers);
     headers.set("Accept", "application/json");
-    if (options.body) headers.set("Content-Type", "application/json");
+    if (options.body && !(options.body instanceof FormData)) headers.set("Content-Type", "application/json");
     if (this.token) headers.set("Authorization", `Bearer ${this.token}`);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 20_000);
@@ -125,17 +169,26 @@ export class ApiClient {
   post<T>(path: string, body: unknown, headers?: HeadersInit): Promise<T> {
     return this.call(path, { method: "POST", body: JSON.stringify(body), headers });
   }
+  upload<T>(path: string, body: FormData): Promise<T> {
+    return this.call(path, { method: "POST", body });
+  }
   patch<T>(path: string, body: unknown): Promise<T> {
     return this.call(path, { method: "PATCH", body: JSON.stringify(body) });
   }
+  put<T>(path: string, body: unknown): Promise<T> {
+    return this.call(path, { method: "PUT", body: JSON.stringify(body) });
+  }
 
-  async download(path: string, filename: string) {
-    const response = await fetch(`${(process.env.NEXT_PUBLIC_API_URL || "/api").replace(/\/$/, "")}${path}`, { headers: this.token ? { Authorization: `Bearer ${this.token}` } : {}, cache: "no-store", credentials: "omit" });
-    if (response.status === 401) { this.expired?.(); throw new ApiError("Сессия завершена. Войдите снова.", 401); }
-    if (!response.ok) { const body = await response.json().catch(() => null); throw new ApiError(detailMessage(body?.detail) || "Не удалось выгрузить журнал", response.status); }
-    const url = URL.createObjectURL(await response.blob());
-    const anchor = document.createElement("a"); anchor.href = url; anchor.download = filename; anchor.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  async download(path: string, filename: string, previewPdf = false) {
+    const viewer = previewPdf && filename.toLowerCase().endsWith(".pdf") ? window.open("about:blank", "_blank") : null;
+    try {
+      const response = await fetch(`${(process.env.NEXT_PUBLIC_API_URL || "/api").replace(/\/$/, "")}${path}`, { headers: this.token ? { Authorization: `Bearer ${this.token}` } : {}, cache: "no-store", credentials: "omit" });
+      if (response.status === 401) { this.expired?.(); throw new ApiError("Сессия завершена. Войдите снова.", 401); }
+      if (!response.ok) { const body = await response.json().catch(() => null); throw new ApiError(detailMessage(body?.detail) || "Не удалось открыть документ", response.status); }
+      const url = URL.createObjectURL(await response.blob());
+      if (viewer) { viewer.opener = null; viewer.location.href = url; setTimeout(() => URL.revokeObjectURL(url), 60_000); }
+      else { const anchor = document.createElement("a"); anchor.href = url; anchor.download = filename; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
+    } catch (error) { viewer?.close(); throw error; }
   }
 }
 

@@ -54,6 +54,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       DEMO_PASSWORD: ${DEMO_PASSWORD:?Set DEMO_PASSWORD in .env}
       ZUP_MODE: ${ZUP_MODE:-mock}
+      ACADEMY_DEMO_AS_OF: ${ACADEMY_DEMO_AS_OF:-2026-10-17}
       ZUP_BASE_URL: ${ZUP_DOCKER_BASE_URL:-http://zup-mock:8300/hs/jana/v1}
       ZUP_AUTH_TYPE: ${ZUP_AUTH_TYPE:-bearer}
       ZUP_API_TOKEN: ${ZUP_API_TOKEN:-${JWT_SECRET:?Set JWT_SECRET in .env}}
@@ -82,7 +83,15 @@ services:
     build: ./backend
     restart: unless-stopped
     init: true
-    environment: *backend_env
+    environment:
+      <<: *backend_env
+      LLM_PROVIDER: ${LLM_PROVIDER:-disabled}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LLM_API_URL: ${LLM_API_URL:-https://api.openai.com/v1/chat/completions}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4.1-mini}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-5}
+      LLM_MAX_OUTPUT_TOKENS: ${LLM_MAX_OUTPUT_TOKENS:-200}
     # File/webhook capability URLs must not appear in access logs.
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
     ports:

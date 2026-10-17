@@ -139,7 +139,7 @@ def test_explicit_seed_ids_do_not_collide_or_rewind_sequences(api, repair):
 
     def run_repair():
         if repair == "migration":
-            command.downgrade(api.db.config, "0007")
+            command.downgrade(api.db.config, "0011")
             command.upgrade(api.db.config, "head")
         else:
             api.db.seed()

@@ -37,10 +37,13 @@ def ranked(question: str, documents, min_score: float = 0.8) -> list[tuple[float
     frequency = Counter(term for field in fields for term in set().union(*field))
     scored = []
     for document, (title, section, keywords, content) in zip(documents, fields):
+        matched = query & (title | section | keywords | content)
+        if len(matched) < max(1, math.ceil(len(query) * 0.5)):
+            continue
         score = sum(math.log((len(documents) + 1) / (frequency[term] + 0.5)) *
                     max((3.0 if term in keywords else 0), (2.5 if term in title else 0),
                         (1.5 if term in section else 0), (1.0 if term in content else 0))
-                    for term in query if term in title | section | keywords | content)
+                    for term in matched)
         if score >= min_score:
             scored.append((score, document))
     return sorted(scored, key=lambda item: (-item[0], item[1].id))

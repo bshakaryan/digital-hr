@@ -1,8 +1,9 @@
 from functools import lru_cache
+from datetime import date
 from typing import Literal
 from urllib.parse import urlparse
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
@@ -26,7 +27,15 @@ class Settings(BaseSettings):
     jwt_secret: str = Field(min_length=32)
     token_minutes: int = Field(default=60, ge=1, le=1440)
     demo_password: str | None = Field(default=None, min_length=12)
+    academy_demo_as_of: date = date(2026, 10, 17)
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+    llm_provider: Literal["disabled", "openai_compatible"] = "disabled"
+    llm_api_key: SecretStr | None = None
+    openai_api_key: SecretStr | None = None
+    llm_api_url: str = "https://api.openai.com/v1/chat/completions"
+    llm_model: str = "gpt-4.1-mini"
+    llm_timeout_seconds: float = Field(default=5, ge=1, le=10)
+    llm_max_output_tokens: int = Field(default=200, ge=64, le=400)
     zup_mode: Literal["mock", "real"] = "mock"
     zup_base_url: str = "http://127.0.0.1:8300/hs/jana/v1"
     zup_auth_type: Literal["bearer", "basic"] = "bearer"
@@ -55,6 +64,13 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_zup_connection(self):
+        if self.llm_provider != "disabled":
+            url = urlparse(self.llm_api_url)
+            if (url.scheme != "https" or not url.netloc or url.username or url.password
+                    or url.query or url.fragment or not url.path.endswith("/chat/completions")):
+                raise ValueError("LLM_API_URL должен быть HTTPS endpoint /chat/completions без учётных данных и query")
+            if not self.llm_model.strip():
+                raise ValueError("LLM_MODEL не может быть пустым")
         parsed = urlparse(self.zup_base_url)
         if parsed.scheme not in ("http", "https") or not parsed.netloc:
             raise ValueError("ZUP_BASE_URL должен быть абсолютным HTTP(S) URL")
