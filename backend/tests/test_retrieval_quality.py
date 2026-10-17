@@ -81,7 +81,7 @@ def test_permissions_and_course_scope_still_precede_retrieval(api, corpus, monke
 
 
 def test_mocked_provider_and_extract_fallback_keep_same_citation(api, corpus, monkeypatch):
-    settings = Settings(_env_file=None, database_url="sqlite:///unused.sqlite3",
+    settings = Settings(_env_file=None, database_url=os.environ["DATABASE_URL"],
         jwt_secret="test-only-jwt-secret-never-use-outside-pytest-2026",
         llm_provider="openai_compatible", llm_api_key="test-provider-key", openai_api_key=None)
     requests = []
