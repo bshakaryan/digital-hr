@@ -43,6 +43,8 @@ def database(monkeypatch, tmp_path):
     monkeypatch.setenv("DEMO_PASSWORD", TEST_PASSWORD)
     monkeypatch.setenv("ZUP_API_TOKEN", TEST_SECRET)
     monkeypatch.setenv("DOCUMENTOLOG_MODE", "disabled")
+    monkeypatch.setenv("LLM_PROVIDER", "disabled")
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
 
     from app.config import get_settings
     from app.database import Base, get_engine

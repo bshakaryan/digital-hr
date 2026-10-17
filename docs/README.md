@@ -11,6 +11,7 @@
 - [Проверки и ограничения](verification.md)
 - [Аудит по критериям кейса 2](audit-case-02.md)
 - [Сценарий демонстрации](demo-scenarios.md)
+- [Опциональный LLM для AI Jana](ai-jana-llm.md)
 - [Mock 1С:ЗУП и подключение к реальной базе](zup-integration.md)
 - [Mock Documentolog и контракт будущего подключения](documentolog-integration.md)
 

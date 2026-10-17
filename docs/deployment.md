@@ -8,7 +8,7 @@
 
 - Runtime: Docker; Root Directory: пустое поле (корень Git-репозитория).
 - Dockerfile Path: `./Dockerfile`; Docker Build Context: `.`; Docker Command: пустое поле, чтобы использовать `CMD` образа.
-- Environment: задайте `JWT_SECRET` минимум 32 случайных символа и `DEMO_PASSWORD` минимум 12 символов. Дополнительные отдельные `ZUP_API_TOKEN` и `DOCUMENTOLOG_API_KEY` поддерживаются; иначе в этом демо применяется JWT-секрет. Значения не включаются в Git или образ.
+- Environment: задайте `JWT_SECRET` минимум 32 случайных символа и `DEMO_PASSWORD` минимум 12 символов. Дополнительные отдельные `ZUP_API_TOKEN` и `DOCUMENTOLOG_API_KEY` поддерживаются; иначе в этом демо применяется JWT-секрет. Для AI Jana можно дополнительно задать `LLM_PROVIDER`, `LLM_API_KEY`, `LLM_API_URL`, `LLM_MODEL` по [инструкции](ai-jana-llm.md). Значения секретов не включаются в Git или образ.
 - Health Check Path: `/api/health`. Next.js слушает `0.0.0.0:$PORT`; внутренние сервисы слушают только loopback. Render задаёт `PORT` и `RENDER_EXTERNAL_URL`; последний используется для ссылок на mock Documentolog.
 - Для сохранения данных подключите persistent disk с Mount Path `/var/data`. Здесь хранятся три SQLite-файла. Без постоянного диска данные этого варианта запуска не сохраняются при замене контейнера. Существующие локальные данные автоматически не переносятся.
 
