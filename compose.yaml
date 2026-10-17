@@ -54,6 +54,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       DEMO_PASSWORD: ${DEMO_PASSWORD:?Set DEMO_PASSWORD in .env}
       ZUP_MODE: ${ZUP_MODE:-mock}
+      ACADEMY_DEMO_AS_OF: ${ACADEMY_DEMO_AS_OF:-2026-10-17}
       ZUP_BASE_URL: ${ZUP_DOCKER_BASE_URL:-http://zup-mock:8300/hs/jana/v1}
       ZUP_AUTH_TYPE: ${ZUP_AUTH_TYPE:-bearer}
       ZUP_API_TOKEN: ${ZUP_API_TOKEN:-${JWT_SECRET:?Set JWT_SECRET in .env}}

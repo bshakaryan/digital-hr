@@ -1,4 +1,5 @@
 from functools import lru_cache
+from datetime import date
 from typing import Literal
 from urllib.parse import urlparse
 
@@ -13,6 +14,7 @@ class Settings(BaseSettings):
     jwt_secret: str = Field(min_length=32)
     token_minutes: int = Field(default=60, ge=1, le=1440)
     demo_password: str | None = Field(default=None, min_length=12)
+    academy_demo_as_of: date = date(2026, 10, 17)
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     zup_mode: Literal["mock", "real"] = "mock"
     zup_base_url: str = "http://127.0.0.1:8300/hs/jana/v1"

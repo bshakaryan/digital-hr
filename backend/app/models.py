@@ -167,6 +167,10 @@ class Course(Base):
     question: Mapped[str] = mapped_column(String(500))
     options_json: Mapped[str] = mapped_column(Text)
     correct_index: Mapped[int] = mapped_column(Integer)
+    objectives: Mapped[str] = mapped_column(Text, default="", server_default="")
+    status: Mapped[str] = mapped_column(String(20), default="published", server_default="published")
+    category: Mapped[str] = mapped_column(String(30), default="general", server_default="general")
+    demo_code: Mapped[str | None] = mapped_column(String(40), unique=True)
 
 
 class CourseAssignment(Base):
@@ -180,6 +184,7 @@ class CourseAssignment(Base):
     course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"))
     progress: Mapped[int] = mapped_column(Integer, default=0)
     completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    deadline: Mapped[date | None] = mapped_column(Date)
 
 
 class KnowledgeDocument(Base):
@@ -190,6 +195,39 @@ class KnowledgeDocument(Base):
     content: Mapped[str] = mapped_column(Text)
     keywords: Mapped[str] = mapped_column(Text)
     access_scope: Mapped[str] = mapped_column(String(20), default="all")
+    file_id: Mapped[int | None] = mapped_column(ForeignKey("knowledge_files.id"), index=True)
+    page_number: Mapped[int | None] = mapped_column(Integer)
+    chunk_index: Mapped[int | None] = mapped_column(Integer)
+    file: Mapped["KnowledgeFile | None"] = relationship()
+
+
+class KnowledgeFile(Base):
+    __tablename__ = "knowledge_files"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    sha256: Mapped[str] = mapped_column(String(64), unique=True)
+    filename: Mapped[str] = mapped_column(String(255))
+    title: Mapped[str] = mapped_column(String(200))
+    document_code: Mapped[str | None] = mapped_column(String(40))
+    version: Mapped[str] = mapped_column(String(80))
+    language: Mapped[str] = mapped_column(String(10))
+    classification: Mapped[str] = mapped_column(String(40))
+    source_note: Mapped[str] = mapped_column(Text)
+    access_scope: Mapped[str] = mapped_column(String(20))
+    media_type: Mapped[str] = mapped_column(String(100))
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    original_bytes: Mapped[bytes] = mapped_column(LargeBinary)
+    uploaded_by: Mapped[int] = mapped_column(ForeignKey("employees.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class CourseMaterial(Base):
+    __tablename__ = "course_materials"
+    __table_args__ = (UniqueConstraint("course_id", "file_id", name="uq_course_material"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"))
+    file_id: Mapped[int] = mapped_column(ForeignKey("knowledge_files.id"))
+    attached_by: Mapped[int] = mapped_column(ForeignKey("employees.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class AuditEvent(Base):

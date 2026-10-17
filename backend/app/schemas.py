@@ -141,6 +141,47 @@ class CourseOut(BaseModel):
     completed: bool
     question: str
     options: list[str]
+    objectives: str = ""
+    status: Literal["draft", "published"] = "published"
+    category: str = "general"
+    is_demo: bool = False
+    deadline: date | None = None
+    learning_status: Literal["completed", "in_progress", "not_started"] = "not_started"
+    overdue: bool = False
+
+
+class CourseDraft(Input):
+    title: str = Field(min_length=1, max_length=200)
+    description: str = Field(min_length=1, max_length=2000)
+    objectives: str = Field(min_length=1, max_length=2000)
+    duration_minutes: int = Field(default=10, ge=1, le=480, strict=True)
+    category: Literal["general", "onboarding", "logistics", "warehouse_safety", "customer_service"] | None = None
+
+    @model_validator(mode="after")
+    def nonempty(self):
+        if not all((self.title.strip(), self.description.strip(), self.objectives.strip())):
+            raise ValueError("Название, описание и цели обучения обязательны")
+        return self
+
+
+class CourseQuiz(Input):
+    question: str = Field(min_length=3, max_length=500)
+    options: list[str] = Field(min_length=2, max_length=4)
+    correct_index: int = Field(ge=0, strict=True)
+
+    @model_validator(mode="after")
+    def valid_answers(self):
+        cleaned = [option.strip() for option in self.options]
+        if not self.question.strip() or any(not option or len(option) > 300 for option in cleaned):
+            raise ValueError("Заполните вопрос и варианты ответов (до 300 символов)")
+        if len(set(cleaned)) != len(cleaned) or self.correct_index >= len(cleaned):
+            raise ValueError("Варианты должны различаться; выберите существующий правильный ответ")
+        return self
+
+
+class CourseAssign(Input):
+    employee_id: int = Field(gt=0, strict=True)
+    deadline: date | None = None
 
 
 class RewardsOut(BaseModel):
@@ -168,6 +209,106 @@ class Source(BaseModel):
     section: str
     content: str
     source_type: Literal["knowledge", "course"] = "knowledge"
+    file_id: int | None = None
+    source_filename: str | None = None
+    page_number: int | None = None
+    document_code: str | None = None
+    version: str | None = None
+    language: str | None = None
+    classification: str | None = None
+    source_note: str | None = None
+
+
+class KnowledgeFileOut(BaseModel):
+    id: int
+    filename: str
+    title: str
+    document_code: str | None
+    version: str
+    language: str
+    classification: Literal["synthetic_demo", "external_legal_snapshot", "external_reference"]
+    source_note: str
+    access_scope: Literal["all", "employee", "manager", "hr_admin"]
+    sha256: str
+    size_bytes: int
+    chunk_count: int
+    duplicate: bool = False
+
+
+class CourseCatalogItem(BaseModel):
+    id: int
+    title: str
+    description: str
+    objectives: str = ""
+    duration_minutes: int = 10
+    status: Literal["draft", "published"] = "published"
+    question: str = ""
+    options: list[str] = Field(default_factory=list)
+    correct_index: int = 0
+    category: str = "general"
+    is_demo: bool = False
+
+
+class PublicCourseItem(BaseModel):
+    id: int
+    title: str
+    description: str
+    objectives: str
+    duration_minutes: int
+    category: str
+    is_demo: bool
+
+
+class LearningAssignmentOut(BaseModel):
+    employee_id: int
+    employee_name: str
+    department: str
+    course_id: int
+    course_title: str
+    category: str
+    progress: int
+    deadline: date | None
+    status: Literal["completed", "in_progress", "not_started"]
+    overdue: bool
+    completed_at: UTCDateTime | None
+    last_activity_at: UTCDateTime | None
+
+
+class EmployeeLearningOut(BaseModel):
+    employee_id: int
+    employee_name: str
+    department: str
+    position: str
+    manager_name: str | None
+    total_assigned: int
+    completed: int
+    in_progress: int
+    not_started: int
+    overdue: int
+    completion_rate: float
+    xp: int
+    level: int
+    badges: list[str]
+    assignments: list[LearningAssignmentOut]
+
+
+class LearningAnalyticsOut(BaseModel):
+    as_of: date
+    total_demo_employees: int
+    published_courses: int
+    total_assignments: int
+    completion_rate: float
+    overdue_assignments: int
+    status_counts: dict[str, int]
+    course_completion: list[dict]
+    daily_activity: list[dict]
+    overdue_by_department: list[dict]
+    assignments: list[LearningAssignmentOut]
+    employees: list[EmployeeLearningOut]
+
+
+class AttachMaterial(Input):
+    file_id: int = Field(gt=0)
 
 
 class AssistantOut(BaseModel):

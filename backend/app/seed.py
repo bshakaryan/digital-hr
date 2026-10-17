@@ -3,7 +3,7 @@ import json
 from dataclasses import asdict
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -99,6 +99,13 @@ def seed():
                     record(db, 2, f"request.{status}", "request", request.id)
                     notify(db, 1, "request_status", "Демонстрационное решение по заявке", f"Заявка №{request.id}: {status}", entity_type="request", entity_id=request.id, actor_id=2)
         db.commit()
+        # Seed inserts explicit IDs for these demo rows. PostgreSQL sequences do
+        # not advance for them; align the next generated ID after seeding.
+        if db.bind.dialect.name == "postgresql":
+            for table in ("employees", "courses", "knowledge_documents"):
+                db.execute(text(f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), "
+                                f"(SELECT COALESCE(MAX(id), 0) + 1 FROM {table}), false)"))
+            db.commit()
     print("Демо-данные готовы. Существующие записи и пароли сохранены.")
 
 

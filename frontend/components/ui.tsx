@@ -49,7 +49,7 @@ export function ErrorBox({ message, retry }: { message: string; retry?: () => vo
 export function Empty({ icon = "document", title, text, action }: { icon?: IconName; title: string; text: string; action?: ReactNode }) {
   return <div className="empty-state"><span className="empty-icon"><Icon name={icon} size={27} /></span><h3>{title}</h3><p>{text}</p>{action}</div>;
 }
-export function Modal({ title, children, onClose, wide = false }: { title: string; children: ReactNode; onClose: () => void; wide?: boolean }) {
+export function Modal({ title, children, onClose, wide = false, className = "" }: { title: string; children: ReactNode; onClose: () => void; wide?: boolean; className?: string }) {
   const id = useId();
   const dialog = useRef<HTMLDialogElement>(null);
   const close = useRef(onClose);
@@ -62,5 +62,5 @@ export function Modal({ title, children, onClose, wide = false }: { title: strin
     element?.addEventListener("cancel", cancel);
     return () => { element?.removeEventListener("cancel", cancel); element?.close(); if (previous instanceof HTMLElement) previous.focus(); };
   }, []);
-  return <dialog ref={dialog} className={`modal ${wide ? "modal-wide" : ""}`} aria-labelledby={id} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}><div className="modal-inner"><div className="modal-header"><h2 id={id}>{title}</h2><button className="icon-button" onClick={onClose} aria-label="Закрыть"><Icon name="close" /></button></div>{children}</div></dialog>;
+  return <dialog ref={dialog} className={`modal ${wide ? "modal-wide" : ""} ${className}`} aria-labelledby={id} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}><div className="modal-inner"><div className="modal-header"><h2 id={id}>{title}</h2><button className="icon-button" onClick={onClose} aria-label="Закрыть"><Icon name="close" /></button></div>{children}</div></dialog>;
 }

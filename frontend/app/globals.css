@@ -326,6 +326,66 @@ dd { margin: 7px 0 0; font-size: 13px; overflow-wrap: anywhere; }
 .material-read { width: 100%; }
 
 /* Knowledge assistant */
+.knowledge-admin { margin: 24px 0; padding: 24px; }
+.academy-admin { margin: 22px 0; padding: 24px; }
+.academy-admin-heading h2 { margin: 5px 0 7px; font-size: 20px; }
+.academy-admin-heading p,.academy-admin-step p { margin: 0; color: #666668; font-size: 13px; line-height: 1.6; }
+.academy-admin h3 { margin: 26px 0 12px; font-size: 17px; }
+.academy-admin-grid { display: grid; grid-template-columns: minmax(0,2fr) minmax(150px,1fr); gap: 12px; margin: 18px 0; }
+.academy-admin-grid label,.academy-quiz-editor label { display: grid; gap: 6px; color: #3e4a3d; font-size: 12px; }
+.academy-admin-grid input,.academy-admin-grid textarea,.academy-quiz-editor input,.academy-inline select { width: 100%; min-height: 42px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: #253326; font: inherit; }
+.academy-admin-grid textarea { min-height: 78px; resize: vertical; }
+.academy-admin-wide { grid-column: 1 / -1; }
+.academy-admin-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.academy-admin-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: #263d28; text-align: left; cursor: pointer; }
+.academy-admin-item.is-active { border-color: #008c00; background: #eef7ec; }
+.academy-admin-item span { color: #607264; font-size: 11px; }
+.academy-editor { margin-top: 19px; padding: 19px; border: 1px solid #dce7d0; border-radius: 12px; background: #fbfdfa; }
+.academy-editor-title { display: flex; align-items: center; gap: 12px; }
+.academy-editor-title h3 { margin: 0; }
+.academy-admin-step { margin-top: 20px; padding-top: 19px; border-top: 1px solid #dce7d0; }
+.academy-admin-step h4 { margin: 0 0 6px; font-size: 15px; }
+.academy-admin-step ul { padding-left: 20px; color: #3e4a3d; font-size: 13px; }
+.academy-inline { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 13px; }
+.academy-inline select { flex: 1; min-width: 220px; }
+.academy-assignment { display: grid; gap: 12px; margin-top: 14px; }
+.academy-assignment-search { display: grid; gap: 6px; color: #3e4a3d; font-size: 12px; }
+.academy-assignment-search input { width: 100%; min-height: 42px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: #253326; font: inherit; }
+.academy-assignment-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 12px; color: #607264; }
+.academy-assignment-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; max-height: 250px; overflow-y: auto; margin: 0; padding: 2px; border: 0; }
+.academy-assignment-person { display: flex; align-items: center; gap: 11px; min-width: 0; padding: 11px 12px; border: 1px solid #dfe5db; border-radius: 9px; background: #fff; cursor: pointer; }
+.academy-assignment-person:has(input:checked) { border-color: #8cbd85; background: #eef7ec; }
+.academy-assignment-person input { flex: none; width: 17px; height: 17px; margin: 0; accent-color: #008c00; }
+.academy-assignment-person span { display: grid; gap: 3px; min-width: 0; }
+.academy-assignment-person strong { overflow-wrap: anywhere; font-size: 12px; }
+.academy-assignment-person small { color: #607264; overflow-wrap: anywhere; font-size: 11px; }
+.academy-assignment-list > p { color: #666668; font-size: 12px; }
+.academy-assignment > .button { justify-self: start; }
+.academy-quiz-editor { display: grid; gap: 10px; margin-top: 12px; }
+.academy-option-editor { display: flex; align-items: center; gap: 10px; }
+.academy-option-editor input[type="radio"] { width: auto; min-height: auto; accent-color: #008c00; }
+.course-objectives { margin: 16px 0; padding: 16px 18px; border-left: 3px solid #008c00; background: #f3f8f1; white-space: pre-line; }
+.course-objectives p { margin: 7px 0 0; font-size: 13px; line-height: 1.7; }
+.knowledge-admin h2 { font-size: 20px; margin: 0 0 8px; }
+.knowledge-admin h3 { font-size: 16px; margin: 24px 0 12px; }
+.knowledge-admin p,.knowledge-admin small { color: #666668; line-height: 1.5; }
+.knowledge-admin-form,.knowledge-attach-form { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; margin-top: 18px; align-items: end; }
+.knowledge-admin-form label,.knowledge-attach-form label { display: grid; gap: 6px; font-size: 12px; }
+.knowledge-admin-form input,.knowledge-admin-form select,.knowledge-attach-form select { width: 100%; min-height: 40px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: white; }
+.knowledge-file-field { display: grid; gap: 6px; min-width: 0; font-size: 12px; }
+.knowledge-file-picker { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.knowledge-admin-form .knowledge-file-input { position: absolute; width: 1px; height: 1px; min-height: 0; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.knowledge-file-input:focus-visible + label { outline: 3px solid #76b98a; outline-offset: 3px; }
+.knowledge-file-picker > label { flex: none; cursor: pointer; }
+.knowledge-file-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #666668; font-size: 12px; }
+.knowledge-admin-wide { grid-column: span 2; }
+.course-documents { padding: 18px 0; }
+.course-documents ul { padding-left: 20px; }
+.course-documents li { margin: 9px 0; }
+.course-documents li small { display: block; color: #666668; }
+@media (max-width: 760px) { .knowledge-admin-form,.knowledge-attach-form { grid-template-columns: 1fr; } .knowledge-admin-wide { grid-column: auto; } }
+@media (max-width: 760px) { .academy-admin-grid { grid-template-columns: 1fr; } .academy-admin-wide { grid-column: auto; } .academy-editor { padding: 14px; } }
+@media (max-width: 640px) { .academy-assignment-list { grid-template-columns: 1fr; } .academy-assignment > .button { width: 100%; } }
 .assistant-panel { max-width: 940px; }
 .assistant-panel-header { display: flex; align-items: center; gap: 12px; padding: 19px 25px; border-bottom: 1px solid var(--line); }
 .assistant-panel-header > div { flex: 1; }

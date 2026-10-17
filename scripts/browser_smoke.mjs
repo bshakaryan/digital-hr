@@ -101,7 +101,7 @@ try {
     await course.getByRole("heading", { name: "Курс завершён" }).waitFor();
   }
   await course.getByRole("button", { name: "Закрыть", exact: true }).click();
-  await tab(page, "HR-помощник");
+  await tab(page, "AI Jana");
   await page.getByRole("button", { name: "Как подать заявку на отпуск?", exact: true }).click();
   await page.getByRole("button", { name: /Как подать заявку на отпуск Заявки/ }).click();
   const source = page.getByRole("dialog", { name: "Источник ответа" });
