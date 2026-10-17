@@ -12,7 +12,7 @@ RUN npm run build
 
 FROM python:3.12-slim-bookworm AS runtime
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=10000 DATA_DIR=/var/data
+    NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=10000 DATA_DIR=/var/data PYTHONPATH=/app/backend
 WORKDIR /app/backend
 COPY backend/requirements.lock ./requirements.lock
 RUN apt-get update && apt-get install -y --no-install-recommends libstdc++6 \

@@ -1,6 +1,5 @@
 """Run the demo on a single Docker web host; fail if any child exits."""
 import os
-from pathlib import Path
 import signal
 import subprocess
 import sys
@@ -8,30 +7,30 @@ import time
 from urllib.error import URLError
 from urllib.request import urlopen
 
+from app.web_storage import prepare_storage, verify_storage
+
 
 def main():
-    data = Path(os.environ.get("DATA_DIR", "/var/data"))
-    data.mkdir(parents=True, exist_ok=True)
-    # Mounted disks may initially belong to root. All application children run as jana.
-    if os.getuid() == 0:
-        os.chown(data, 1000, 1000)
-        os.setgroups([])
-        os.setgid(1000)
-        os.setuid(1000)
     env = os.environ.copy()
     if len(env.get("JWT_SECRET", "")) < 32 or len(env.get("DEMO_PASSWORD", "")) < 12:
         raise RuntimeError("Set JWT_SECRET (32+ characters) and DEMO_PASSWORD (12+ characters) in hosting Environment settings")
     if env.get("ZUP_MODE", "mock") != "mock" or env.get("DOCUMENTOLOG_MODE", "mock") != "mock":
         raise RuntimeError("The root Dockerfile runs the mock demo; use the separate-service deployment for real integrations")
+    root = os.getuid() == 0
+    storage = prepare_storage(env, owner=(1000, 1000) if root else None)
+    # Prepare configured paths and existing DB/journal ownership before dropping
+    # privileges, then verify writes as the actual application user.
+    if root:
+        os.setgroups([])
+        os.setgid(1000)
+        os.setuid(1000)
+    verify_storage(storage)
     defaults = {
-        "DATABASE_URL": f"sqlite:///{data / 'jana.sqlite3'}",
         "ZUP_MODE": "mock", "ZUP_AUTH_TYPE": "bearer",
         "ZUP_BASE_URL": "http://127.0.0.1:8300/hs/jana/v1",
-        "ZUP_MOCK_DATABASE": str(data / "zup.sqlite3"),
         "ZUP_API_TOKEN": env["JWT_SECRET"],
         "DOCUMENTOLOG_MODE": "mock", "DOCUMENTOLOG_API_KEY": env["JWT_SECRET"],
         "DOCUMENTOLOG_BASE_URL": "http://127.0.0.1:8400",
-        "DOCUMENTOLOG_MOCK_DATABASE": str(data / "documentolog.sqlite3"),
         "DOCUMENTOLOG_MOCK_BACKEND_URL": "http://127.0.0.1:8000",
         "DOCUMENTOLOG_PUBLIC_URL": "http://127.0.0.1:8000",
         "DOCUMENTOLOG_CALLBACK_URL": "http://127.0.0.1:8000",
