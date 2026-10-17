@@ -8,7 +8,7 @@ from app.database import get_db
 from app.config import get_settings
 from app.models import Employee, KnowledgeDocument
 from app.modules.assistant_llm import generate_answer
-from app.modules.retrieval import evidence, ranked, terms
+from app.modules.retrieval import ACTION_EQUIVALENTS, concepts, evidence, ranked, supports, terms
 from app.schemas import AssistantOut, Question, Source
 from app.security import current_user
 
@@ -65,24 +65,28 @@ def answer_from_documents(question: str, documents, *, source_type="knowledge", 
     matches = ranked(question, documents, min_score=min_score)
     if not matches:
         return refusal
-    document = matches[0][1]
-    query_terms = terms(question)
-    if len(query_terms) == 2 and not query_terms <= terms(
-        " ".join((document.title, document.section, document.keywords or "", document.content))
-    ):
-        return refusal
-    passage = evidence(question, document.content)
-    if not passage.strip():
-        return refusal
-    file = getattr(document, "file", None)
-    if file and file.classification == "external_legal_snapshot":
-        prefix = f"В предоставленной копии Трудового кодекса ({file.version}; актуальность не подтверждена): "
-    elif file and file.classification == "synthetic_demo":
-        prefix = "По демонстрационному материалу: "
-    else:
-        prefix = "По демонстрационной базе: "
-    wording = generate_answer(question, passage, get_settings())
-    if wording == "NO_EVIDENCE":
-        return refusal
-    return AssistantOut(answer=prefix + (wording or passage) + " [1]",
-                        sources=[source(document, source_type)], escalate_to_hr=False)
+    action_question = ACTION_EQUIVALENTS in concepts(question)
+    for _, document in matches[:16]:
+        if not supports(question, " ".join((document.title, document.section,
+                                            document.keywords or "", document.content))):
+            continue
+        passage = evidence(question, document.content)
+        passage_terms = terms(passage)
+        if not passage_terms or not (terms(question) & passage_terms):
+            continue
+        if action_question and (not supports(question, document.title + " " + passage)
+                                or not (ACTION_EQUIVALENTS & passage_terms)):
+            continue
+        file = getattr(document, "file", None)
+        if file and file.classification == "external_legal_snapshot":
+            prefix = f"В предоставленной копии Трудового кодекса ({file.version}; актуальность не подтверждена): "
+        elif file and file.classification == "synthetic_demo":
+            prefix = "По демонстрационному материалу: "
+        else:
+            prefix = "По демонстрационной базе: "
+        wording = generate_answer(question, passage, get_settings())
+        if wording == "NO_EVIDENCE":
+            return refusal
+        return AssistantOut(answer=prefix + (wording or passage) + " [1]",
+                            sources=[source(document, source_type)], escalate_to_hr=False)
+    return refusal
