@@ -1,5 +1,35 @@
 # Docker-комплект для сервера
 
+## Один Docker-сервис на Render
+
+Корневой `Dockerfile` собирает весь демонстрационный продукт для хостинга одного контейнера: Next.js, FastAPI, worker и два HTTP mock-сервиса. Это отдельный способ запуска; `compose.yaml` продолжает использовать отдельные сервисы и PostgreSQL. В корневом образе по умолчанию используется SQLite, а HTTP-маршруты `/api` и браузерная форма mock Documentolog проксируются через один внешний порт.
+
+Для существующего Web Service в Render:
+
+- Runtime: Docker; Root Directory: пустое поле (корень Git-репозитория).
+- Dockerfile Path: `./Dockerfile`; Docker Build Context: `.`; Docker Command: пустое поле, чтобы использовать `CMD` образа.
+- Environment: задайте `JWT_SECRET` минимум 32 случайных символа и `DEMO_PASSWORD` минимум 12 символов. Дополнительные отдельные `ZUP_API_TOKEN` и `DOCUMENTOLOG_API_KEY` поддерживаются; иначе в этом демо применяется JWT-секрет. Значения не включаются в Git или образ.
+- Health Check Path: `/api/health`. Next.js слушает `0.0.0.0:$PORT`; внутренние сервисы слушают только loopback. Render задаёт `PORT` и `RENDER_EXTERNAL_URL`; последний используется для ссылок на mock Documentolog.
+- Для сохранения данных подключите persistent disk с Mount Path `/var/data`. Здесь хранятся три SQLite-файла. Без постоянного диска данные этого варианта запуска не сохраняются при замене контейнера. Существующие локальные данные автоматически не переносятся.
+
+После сохранения настроек выполните Deploy latest commit. Корневой образ применяет миграции и создаёт демо-профили только в пустой базе. Перезапуск заполненной базы не восстанавливает специально удалённые начальные заявки. Если любой дочерний процесс завершается, основной процесс останавливает контейнер, чтобы хостинг обнаружил сбой. SIGTERM останавливает все процессы.
+
+Локальная проверка аналогичного запуска:
+
+```sh
+docker build -t digital-hr-web .
+docker run --rm --env-file .env -e PORT=10000 \
+  -e RENDER_EXTERNAL_URL=http://localhost:10000 \
+  -e DATABASE_URL=sqlite:////var/data/jana.sqlite3 \
+  -p 127.0.0.1:10000:10000 -v digital_hr_web_data:/var/data digital-hr-web
+```
+
+В этом примере `.env` должен содержать нужные секреты; не передавайте настройки внешней сети Compose (`backend`, `zup-mock`, `documentolog-mock`) в одиночный контейнер. Корневой образ предназначен для mock-демонстрации; для реальных интеграций используйте отдельные сервисы. SQLite не обеспечивает проверенные PostgreSQL-блокировки конкурирующих решений.
+
+Основание для настроек хостинга: [Docker on Render](https://render.com/docs/docker), [Web Services](https://render.com/docs/web-services), [Persistent Disks](https://render.com/docs/disks).
+
+## Комплект для Docker Compose
+
 Комплект содержит готовые образы backend, frontend и PostgreSQL, самостоятельный `compose.json`, `deploy.sh` и генератор секретов. Backend-образ также запускает миграции, worker и оба mock-сервиса. Сборка по умолчанию предназначена для Linux `amd64`; данные и секреты локального стенда в неё не входят.
 
 ## Сборка из Git

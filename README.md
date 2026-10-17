@@ -6,6 +6,8 @@
 
 ## Запуск в Docker
 
+Для Render и других хостингов одного Docker-сервиса добавлен корневой `Dockerfile`: сборка из корня запускает весь mock-прототип на `$PORT`. Задайте `JWT_SECRET` и `DEMO_PASSWORD`, для постоянного хранения подключите диск `/var/data`. Точные настройки — [один сервис на Render](docs/deployment.md#один-docker-сервис-на-render).
+
 Готовые образы для переноса на сервер собираются командой `./scripts/build-deploy.sh` (по умолчанию Linux `amd64`). Архив в `dist/` включает образы, Compose и `deploy.sh`; инструкция — [Docker-деплой](docs/deployment.md).
 
 Нужны Git и запущенный Docker с Compose v2. Python, Node.js и PostgreSQL на компьютере устанавливать не нужно.
