@@ -166,6 +166,9 @@ try {
   assert.equal(await page.getByRole("row").filter({ hasText: `№${request.id} ·` }).count(), 0);
   await tab(page, "Главная");
   await page.reload();
+  await page.getByRole("heading", { name: /Сәлем,/ }).waitFor();
+  await logout(page);
+  await page.reload();
   await page.getByRole("heading", { name: "Добро пожаловать" }).waitFor();
 
   const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
@@ -184,7 +187,7 @@ try {
   await small.getByText("Арман Демо", { exact: true }).waitFor();
   assert.deepEqual(errors, [], "Browser JavaScript errors");
   assert.deepEqual(serverErrors, [], "HTTP server errors");
-  console.log(`Browser smoke passed: request ${request.id}, employee → manager → HR → employee, Academy, sources/refusal, session reset, mobile 390px. Screenshots: ${output}`);
+  console.log(`Browser smoke passed: request ${request.id}, employee → manager → HR → employee, Academy, sources/refusal, session restore/logout, mobile 390px. Screenshots: ${output}`);
 } catch (error) {
   await lastPage?.screenshot({ path: `${output}/failure.png`, fullPage: true }).catch(() => {});
   throw error;

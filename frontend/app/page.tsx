@@ -1,29 +1,28 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { ApiClient, errorMessage, type Profile } from "@/lib/api";
-import { Brand, ErrorBox, Icon } from "@/components/ui";
+import { Brand, ErrorBox, Icon, Loading } from "@/components/ui";
 import { Workspace } from "@/components/workspace";
+import { useSession, type Session } from "@/components/use-session";
 
-interface Session { token: string; profile: Profile }
 const demoAccounts = [
   ["Сотрудник", "employee@example.com"], ["Руководитель", "manager@example.com"],
   ["HR", "hr@example.com"], ["Другая команда", "outsider@example.com"],
 ];
 
 export default function Home() {
-  const [session, setSession] = useState<Session | null>(null);
-  const [sessionMessage, setSessionMessage] = useState("");
-  const expire = useCallback((token: string) => {
-    setSession((current) => {
-      if (current?.token !== token) return current;
-      return null;
-    });
-    setSessionMessage("Сессия завершена. Войдите снова, чтобы продолжить.");
-  }, []);
-  const api = useMemo(() => session ? new ApiClient(session.token, () => expire(session.token)) : null, [session, expire]);
-  if (!session || !api) return <Login message={sessionMessage} onLogin={(value) => { setSessionMessage(""); setSession(value); }} />;
-  return <Workspace key={session.token} api={api} me={session.profile} onLogout={() => { window.history.replaceState(null, "", window.location.pathname + window.location.search); setSession(null); setSessionMessage(""); }} />;
+  const { session, api, message, restoring, restoreError, login, logout, retry } = useSession();
+  if (restoring || restoreError) return <main className="login-page">
+    <header className="login-header"><a className="brand-home" href="/" aria-label="JanaМен — главная"><Brand /></a></header>
+    {restoring ? <Loading label="Восстанавливаем сессию…" /> : <section className="empty-state">
+      <h1>Не удалось загрузить профиль</h1>
+      <ErrorBox message={restoreError} retry={retry} />
+      <button className="text-button" onClick={logout}>Перейти ко входу</button>
+    </section>}
+  </main>;
+  if (!session || !api) return <Login message={message} onLogin={login} />;
+  return <Workspace key={session.token} api={api} me={session.profile} onLogout={logout} />;
 }
 
 function Login({ onLogin, message }: { onLogin: (session: Session) => void; message: string }) {
@@ -46,7 +45,7 @@ function Login({ onLogin, message }: { onLogin: (session: Session) => void; mess
     finally { busy.current = false; setPending(false); }
   }
   return <main className="login-page">
-    <header className="login-header"><a className="brand-home" href="/" aria-label="JanaМен — главная"><Brand /></a><span className="login-header-label">Люди. Возможности. Jana.</span><span className="tag"><span className="live-dot" /> Демо-пространство</span></header>
+    <header className="login-header"><a className="brand-home" href="/" aria-label="JanaМен — главная"><Brand /></a></header>
     <div className="login-layout">
     <section className="login-story">
       <div className="login-story-main"><span className="eyebrow">С ЗАБОТОЙ О КОМАНДЕ</span><h1>Всё для работы.<br /><span>Больше для вас.</span></h1><p>Ваши возможности — в одном пространстве.<br />Планируйте отдых, учитесь и двигайтесь вперёд.</p><div className="login-features"><div><Icon name="user" size={27} /><strong>Ваш профиль</strong><span>Важное под рукой</span></div><div><Icon name="calendar" size={27} /><strong>Ваш отдых</strong><span>Заявки без рутины</span></div><div><Icon name="book" size={27} /><strong>Ваше развитие</strong><span>Новые знания рядом</span></div></div></div>
@@ -57,6 +56,6 @@ function Login({ onLogin, message }: { onLogin: (session: Session) => void; mess
         {error && <ErrorBox message={error} />}<button className="button button-primary login-submit" disabled={pending}>{pending ? <><span className="spinner" /> Входим…</> : <>Войти в JanaМен <Icon name="arrow" size={18} /></>}</button>
       </form>
       <div className="demo-accounts"><span className="small-label">ДЕМО-ДОСТУП</span><p>Выберите роль и введите настроенный демо-пароль.</p><div>{demoAccounts.map(([label, address]) => <button key={address} className={email === address ? "demo-choice selected" : "demo-choice"} onClick={() => setEmail(address)} disabled={pending}>{label}</button>)}</div><small>Демо-профили вымышлены. Пароль задаётся при запуске сервера.</small></div>
-    </div><div className="login-footer"><Icon name="shield" size={15} /> После обновления страницы потребуется войти снова</div></section></div>
+    </div><div className="login-footer"><Icon name="shield" size={15} /> Вход сохраняется до выхода или завершения сессии</div></section></div>
   </main>;
 }

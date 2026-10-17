@@ -9,6 +9,7 @@
 - [Контракт API](api-contract.md)
 - [Архитектура](architecture.md)
 - [Проверки и ограничения](verification.md)
+- [Аудит по критериям кейса 2](audit-case-02.md)
 - [Сценарий демонстрации](demo-scenarios.md)
 - [Mock 1С:ЗУП и подключение к реальной базе](zup-integration.md)
 - [Mock Documentolog и контракт будущего подключения](documentolog-integration.md)

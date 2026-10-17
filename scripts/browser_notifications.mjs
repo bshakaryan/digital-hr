@@ -72,8 +72,8 @@ try {
   assert.equal((await mutation(page.getByRole("button", { name: "Очистить прочитанные", exact: true }), "/clear-read")).updated, 2);
   await page.getByRole("heading", { name: "Нет прочитанных уведомлений", exact: true }).waitFor();
   await unreadTab(); await count(total - 2);
-  await page.reload(); await page.getByRole("heading", { name: "Добро пожаловать", exact: true }).waitFor();
-  await login(); await count(total - 2); await readTab(); await count(0);
+  await page.reload(); await page.getByRole("button", { name: "JanaМен — главная", exact: true }).waitFor();
+  await count(total - 2); await readTab(); await count(0);
   await page.getByRole("heading", { name: "Нет прочитанных уведомлений", exact: true }).waitFor();
   await unreadTab();
   assert.equal((await mutation(page.getByRole("button", { name: "Прочитать все", exact: true }), "/read-all")).updated, total - 2);
