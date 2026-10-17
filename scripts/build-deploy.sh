@@ -62,5 +62,5 @@ cp docs/deployment.md "$bundle_dir/README.md"
 chmod +x "$bundle_dir/deploy.sh"
 docker image save --platform "$platform" --output "$bundle_dir/images.tar" \
   "$backend_image" "$frontend_image" "$postgres_image"
-tar -czf "$bundle_dir.tar.gz" -C "$project_dir/dist" "$(basename "$bundle_dir")"
+COPYFILE_DISABLE=1 tar -czf "$bundle_dir.tar.gz" -C "$project_dir/dist" "$(basename "$bundle_dir")"
 printf 'Bundle: %s.tar.gz\n' "$bundle_dir"
