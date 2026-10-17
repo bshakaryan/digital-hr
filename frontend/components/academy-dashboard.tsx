@@ -9,6 +9,7 @@ import { PageHeading } from "./workspace";
 import { CourseReader } from "./academy";
 import { CourseAdmin } from "./course-admin";
 import { LearningAnalyticsPanel } from "./learning-analytics";
+import { JanaJourney } from "./jana-journey";
 import styles from "./academy-ux.module.css";
 
 type LearningFilter = "all" | "completed" | "in_progress" | "not_started" | "overdue";
@@ -36,6 +37,7 @@ export function Academy({ api, courses, role, onChanged, notify, initialCourseId
     <header className={styles.hero}><div><span className={styles.eyebrow}>ВАШ УЧЕБНЫЙ МАРШРУТ</span><h2>Учитесь в своём темпе</h2><p>Назначенные курсы, материалы и проверка знаний — в одном месте.</p></div><div className={styles.heroStats} aria-label="Сводка обучения"><div><strong>{courses.data ? completed : "—"}</strong><span>завершено</span></div><div><strong>{courses.data ? inProgress : "—"}</strong><span>в процессе</span></div><div><strong>{courses.data ? overdue : "—"}</strong><span>просрочено</span></div></div></header>
     {rewards.data && <section className={styles.rewards} aria-label="Ваши награды"><div className={styles.levelMark}><Icon name="shield" size={24} /><span>УР. {rewards.data.level}</span></div><div className={styles.rewardBody}><div className={styles.rewardHeading}><div><span className={styles.eyebrow}>ВАШИ ДОСТИЖЕНИЯ</span><h2>Уровень {rewards.data.level} <span>· {rewards.data.xp} XP</span></h2></div><strong>{Math.max(0, rewards.data.next_level_xp - rewards.data.xp)} XP до следующего уровня</strong></div><progress value={rewards.data.xp} max={rewards.data.next_level_xp} aria-label="Прогресс уровня" /><div className={styles.badges}>{rewards.data.badges.length ? rewards.data.badges.map((badge) => <span className={styles.badge} key={badge}><Icon name="check" size={14} />{badge}</span>) : <span className={styles.badgeHint}>Первый значок появится после завершения курса.</span>}</div></div></section>}
     {rewards.error && <ErrorBox message={rewards.error} retry={rewards.reload} />}
+    {role === "employee" && courses.data && <JanaJourney courses={courses.data} rewards={rewards.data} />}
     {(role === "hr_admin" || role === "manager") && <LearningAnalyticsPanel api={api} role={role} />}
     {role === "hr_admin" && <CourseAdmin api={api} notify={notify} />}
     <section className={`academy-my-courses ${styles.assigned}`} aria-label="Назначенные курсы"><div className="academy-section-heading"><div><span className={styles.eyebrow}>01 / МОЁ ОБУЧЕНИЕ</span><h2>Назначенные курсы</h2><p>Материалы и тест доступны здесь. Прогресс сохраняется в вашем аккаунте.</p></div><span className={styles.count}>{assigned.length}</span></div>
