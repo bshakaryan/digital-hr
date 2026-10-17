@@ -1,0 +1,37 @@
+.chat { overflow: hidden; }
+.welcome { max-width: 660px; margin: 0 auto; padding: 25px 4px 30px; text-align: center; }
+.welcomeIcon { display: inline-grid; place-items: center; width: 68px; height: 68px; margin-bottom: 14px; border-radius: 20px; color: #008c00; background: #e9f5e8; }
+.eyebrow, .groupLabel { display: block; color: #55715b; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.welcome h2 { margin: 10px 0 8px; color: #1b3421; font-size: clamp(24px, 4vw, 32px); letter-spacing: -.03em; }
+.welcome > p { max-width: 480px; margin: 0 auto; color: #58645a; font-size: 14px; line-height: 1.6; }
+.promptGroup, .quickActions { margin-top: 28px; text-align: left; }
+.groupLabel { margin-bottom: 11px; }
+.suggestions { display: grid; grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); gap: 10px; }
+.suggestions button { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 58px; padding: 13px 15px; border: 1px solid #dce8da; border-radius: 12px; background: #f8fbf7; color: #23402a; text-align: left; font: inherit; font-size: 13px; line-height: 1.4; cursor: pointer; }
+.suggestions button:hover, .suggestions button:focus-visible { border-color: #008c00; background: #eff8ed; }
+.suggestions button:disabled { cursor: wait; opacity: .6; }
+.suggestions button svg { flex: none; color: #008c00; }
+.actionRow { display: flex; flex-wrap: wrap; gap: 10px; }
+.actionRow :global(.button) { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; text-decoration: none; }
+.guidance { display: block; margin-top: 23px; color: #647168; font-size: 11px; line-height: 1.5; }
+.answerContent { min-width: 0; flex: 1; }
+.answerCard { margin-top: 9px; padding: 16px 18px; border: 1px solid #e0eadf; border-radius: 12px; background: #f8fbf7; }
+.answerCard p { margin: 0; color: #263a2b; font-size: 14px; line-height: 1.7; }
+.contextAction { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin-top: 17px; padding: 15px; border: 1px solid #cce1c8; border-radius: 12px; background: #f0f8ed; }
+.contextAction > div { display: grid; gap: 4px; }
+.contextAction strong { color: #23402a; font-size: 13px; }
+.contextAction span { color: #53665a; font-size: 11px; }
+.contextAction :global(.button) { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
+.courseIntro { margin: 0 0 14px; color: #445b49; font-size: 13px; line-height: 1.6; }
+.courseSuggestions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 13px; }
+.courseSuggestions button { padding: 8px 11px; border: 1px solid #cfe0cb; border-radius: 999px; background: #fff; color: #24562d; font: inherit; font-size: 11px; cursor: pointer; }
+.courseSuggestions button:hover, .courseSuggestions button:focus-visible { border-color: #008c00; background: #ecf7ea; }
+.courseAnswer { margin-top: 16px; padding: 15px; border: 1px solid #dce8d9; border-radius: 12px; background: #fff; }
+.courseAnswer > span { display: block; color: #55715b; font-size: 10px; font-weight: 700; letter-spacing: .08em; }
+.courseAnswer > p { margin: 10px 0 0; color: #263a2b; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
+.courseSources { margin-top: 17px; }
+.courseSources > strong { display: block; color: #445b49; font-size: 11px; margin-bottom: 8px; }
+.courseSources details { margin-top: 7px; padding: 10px 12px; border: 1px solid #e0e8de; border-radius: 8px; }
+.courseSources summary { cursor: pointer; color: #176b22; font-size: 12px; }
+.courseSources details div { padding-top: 9px; color: #445b49; font-size: 12px; line-height: 1.6; white-space: pre-wrap; }
+@media (max-width: 640px) { .welcome { padding: 15px 0 20px; } .welcome > p { font-size: 12px; } .suggestions { grid-template-columns: 1fr; } .actionRow { flex-direction: column; } .actionRow :global(.button) { justify-content: center; width: 100%; } .answerCard { padding: 13px; } .answerCard p { font-size: 12px; } .contextAction :global(.button) { width: 100%; justify-content: center; } }
