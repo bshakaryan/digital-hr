@@ -6,6 +6,31 @@
 .identity h1 { margin: 0; color: #1d3424; font-size: 16px; line-height: 1.25; letter-spacing: -.02em; }
 .identity span { display: block; margin-top: 2px; color: #69736b; font-size: 11px; }
 .headerBadge { padding: 5px 8px; border: 1px solid #dcebdd; border-radius: 999px; color: #487456; background: #f6faf6; font-size: 10px; font-weight: 600; }
+.chatBody, .courseBody { display: flex; flex: 1; min-width: 0; min-height: 0; }
+.chatMain, .courseMain { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
+.historySidebar { display: flex; flex: 0 0 215px; flex-direction: column; min-width: 0; min-height: 0; border-right: 1px solid #e5ede5; background: #f8fbf8; }
+.historyCompact { flex-basis: 175px; }
+.historyToggle { display: none; }
+.historyHeader { display: flex; align-items: center; justify-content: space-between; gap: 6px; flex: none; padding: 14px 11px 9px; }
+.historyHeader strong { color: #29452f; font-size: 12px; }
+.newChat { min-height: 29px; padding: 5px 8px; border: 1px solid #b9dabb; border-radius: 8px; color: #076c20; background: #edf8ed; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+.newChat:hover { background: #e1f2e2; }
+.newChat:disabled { opacity: .5; cursor: wait; }
+.historyList { flex: 1; min-height: 0; overflow-y: auto; padding: 0 7px 12px; }
+.historyItem { display: block; width: 100%; margin: 3px 0; padding: 9px; border: 1px solid transparent; border-radius: 9px; background: transparent; text-align: left; font: inherit; cursor: pointer; }
+.historyItem:hover, .historyItem:focus-visible { border-color: #d6e7d8; background: #fff; }
+.historySelected { border-color: #b7d9bc; background: #eaf6eb; }
+.historyItem:disabled { cursor: wait; opacity: .6; }
+.historyItem span { display: block; overflow: hidden; color: #29402f; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.historyItem small { display: block; margin-top: 3px; color: #708074; font-size: 10px; }
+.historyState, .historyError { margin: 8px 5px; color: #617166; font-size: 11px; line-height: 1.45; }
+.historyError { color: #8a4c40; }
+.historyError button, .historyMore { display: block; margin-top: 6px; padding: 4px 0; border: 0; color: #087c20; background: none; font: inherit; font-weight: 700; cursor: pointer; }
+.historyMore { margin: 5px auto; font-size: 11px; }
+.historyMore:disabled { opacity: .5; cursor: wait; }
+.olderMessages { display: block; margin: 0 auto 16px; padding: 6px 10px; border: 1px solid #dbe8dc; border-radius: 999px; color: #416a49; background: #f9fcf9; font: inherit; font-size: 11px; cursor: pointer; }
+.olderMessages:disabled { opacity: .6; cursor: wait; }
+.threadState { margin: 12px 0; color: #617166; font-size: 12px; }
 .transcript { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: #ccd8ce transparent; }
 .thread { max-width: 790px; margin: 0 auto; padding: 22px 24px 24px; }
 .intro { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 8px 10px; align-items: start; max-width: 660px; }
@@ -60,7 +85,7 @@
 .error { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin: 11px 0 0 36px; padding: 9px 12px; border: 1px solid #e7d8d4; border-radius: 9px; color: #7a4035; background: #fff8f6; font-size: 12px; }
 .error button { padding: 0; border: 0; color: #895020; background: none; font: inherit; font-weight: 700; cursor: pointer; }
 .composer { flex: none; padding: 12px 18px 10px; border-top: 1px solid #e9eeea; background: #fff; }
-.composer form { display: flex; align-items: flex-end; gap: 8px; max-width: 790px; margin: 0 auto; }
+.composer form { position: relative; display: flex; align-items: flex-end; gap: 8px; max-width: 790px; margin: 0 auto; }
 .composer textarea { box-sizing: border-box; flex: 1; min-width: 0; min-height: 46px; max-height: 120px; padding: 11px 13px; border: 1px solid #d7e2d8; border-radius: 12px; outline: none; resize: vertical; color: #26392b; background: #fbfcfb; font: inherit; font-size: 13px; line-height: 1.5; }
 .composer textarea:focus { border-color: #168632; box-shadow: 0 0 0 3px #e7f4e8; }
 .composer button, .courseComposer button { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border: 0; border-radius: 11px; color: #fff; background: #078b27; cursor: pointer; }
@@ -69,6 +94,7 @@
 .composerMeta { display: flex; justify-content: space-between; gap: 12px; max-width: 790px; margin: 6px auto 0; color: #758078; font-size: 10px; line-height: 1.35; }
 .composerMeta span:last-child { flex: none; }
 :global(.course-ai).courseChat { display: flex; flex-direction: column; gap: 0; height: 340px; padding: 0; overflow: hidden; background: #fff; }
+:global(.course-ai).courseWithHistory { height: 420px; }
 .courseHeader { display: flex; align-items: center; gap: 9px; padding: 11px 14px; border-bottom: 1px solid #e9eeea; }
 .courseHeader .brandMark { width: 30px; height: 30px; border-radius: 9px; }
 .courseHeader strong, .courseHeader span { display: block; }
@@ -80,9 +106,19 @@
 .courseWelcome p { margin: 4px 0 10px; color: #526057; font-size: 12px; }
 .courseChat .suggestions button { font-size: 11px; }
 .courseChat .turn + .turn { margin-top: 15px; }
-.courseChat .courseComposer { display: flex; align-items: center; flex: none; flex-wrap: nowrap; gap: 8px; margin: 0; padding: 11px 13px; border-top: 1px solid #e9eeea; }
+.courseChat .courseComposer { position: relative; display: flex; align-items: center; flex: none; flex-wrap: nowrap; gap: 8px; margin: 0; padding: 11px 13px; border-top: 1px solid #e9eeea; }
 .courseComposer input { flex: 1; min-width: 0; height: 42px; padding: 8px 11px; border: 1px solid #d7e2d8; border-radius: 10px; outline: none; background: #fbfcfb; font: inherit; font-size: 12px; }
 .courseComposer input:focus { border-color: #168632; box-shadow: 0 0 0 3px #e7f4e8; }
 .courseComposer button { width: 42px; height: 42px; }
+@media (max-width: 720px) {
+  .chatBody, .courseBody { flex-direction: column; }
+  .historyToggle { display: block; flex: none; width: 100%; padding: 9px 13px; border: 0; border-bottom: 1px solid #e6eee7; color: #246333; background: #f8fbf8; text-align: left; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .historySidebar { display: none; flex: none; width: 100%; max-height: 188px; border-right: 0; border-bottom: 1px solid #e6eee7; }
+  .historyOpen { display: flex; }
+  .historyHeader { padding: 9px 12px 5px; }
+  .historyList { padding-bottom: 7px; }
+  .historyItem { padding: 7px 9px; }
+}
 @media (max-width: 640px) { .chat { height: calc(100dvh - 180px); min-height: 400px; } .header { padding: 11px 13px; } .thread { padding: 16px 12px 18px; } .intro { grid-template-columns: 26px minmax(0, 1fr); gap: 7px; } .introMark { width: 26px; height: 26px; } .introText p { font-size: 12px; } .introOptions { margin-top: 4px; } .suggestions button { font-size: 11px; } .userBubble { max-width: 86%; } .assistantBubble { font-size: 12px; } .composer { padding: 10px 11px 8px; } .composerMeta { font-size: 9px; } :global(.course-ai).courseChat { height: 250px; } .courseTranscript { padding: 12px 10px; } }
+@media (max-width: 640px) { :global(.course-ai).courseWithHistory { height: 370px; } }
 @media (prefers-reduced-motion: reduce) { .loadingDots i { animation: none; opacity: .7; } }
