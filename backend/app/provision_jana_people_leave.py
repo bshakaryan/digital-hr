@@ -24,6 +24,7 @@ class DemoLeave:
     status: str
     month_offset: int
     day: int
+    code: str | None = None
 
 
 # Seven final approvals make every department visible in the current calendar.
@@ -46,6 +47,28 @@ PLAN = (
     DemoLeave("people-030", "manager_approved", 1, 15),
 )
 
+# These are the first visible rows in the shared calendar. The two core demo
+# accounts without manager_id (HR and customer service) cannot submit through
+# the authorized workflow, so no reviewer relationship is invented for them.
+VISIBLE_PLAN = (
+    DemoLeave("demo-1", "approved", 0, 7, "visible-approved-a"),
+    DemoLeave("demo-1", "approved", 0, 19, "visible-approved-b"),
+    DemoLeave("demo-1", "submitted", 0, 13, "visible-submitted"),
+    DemoLeave("demo-1", "rejected", 0, 24, "visible-rejected"),
+    DemoLeave("demo-2", "approved", 0, 4, "visible-approved-a"),
+    DemoLeave("demo-2", "approved", 0, 16, "visible-approved-b"),
+    DemoLeave("demo-2", "manager_approved", 0, 24, "visible-pending-hr"),
+    DemoLeave("demo-2", "rejected", 0, 10, "visible-rejected"),
+    DemoLeave("people-001", "approved", 0, 8, "visible-approved-a"),
+    DemoLeave("people-001", "approved", 0, 22, "visible-approved-b"),
+    DemoLeave("people-001", "manager_approved", 0, 25, "visible-pending-hr"),
+    DemoLeave("people-002", "approved", 0, 13, "visible-approved-a"),
+    DemoLeave("people-002", "approved", 0, 23, "visible-approved-b"),
+    DemoLeave("people-003", "approved", 0, 11, "visible-approved-a"),
+    DemoLeave("people-003", "approved", 0, 28, "visible-approved-b"),
+)
+ALL_PLAN = PLAN + VISIBLE_PLAN
+
 
 def next_month(first: date) -> date:
     return (first.replace(day=28) + timedelta(days=4)).replace(day=1)
@@ -59,14 +82,15 @@ def provision(db: Session, *, as_of: date | None = None) -> dict:
     if any(month.year not in SUPPORTED_YEARS for month in months):
         raise RuntimeError("Current and following month must be supported by the mock ZUP calendar")
 
-    ids = [spec.zup_id for spec in PLAN]
+    ids = {spec.zup_id for spec in ALL_PLAN}
     people = {person.zup_id: person for person in db.scalars(select(Employee).where(Employee.zup_id.in_(ids))).all()}
     hr = db.scalar(select(Employee).where(Employee.zup_id == "demo-3", Employee.role == "hr_admin"))
-    if len(people) != len(PLAN) or hr is None:
+    if len(people) != len(ids) or hr is None:
         raise RuntimeError("Provision Jana People and the demo HR identity before leave scenarios")
 
     prepared = []
-    for spec in PLAN:
+    planned_periods = {}
+    for spec in ALL_PLAN:
         owner = people[spec.zup_id]
         if owner.zup_id != spec.zup_id or owner.role not in ("employee", "manager"):
             raise RuntimeError(f"Synthetic leave author has changed: {spec.zup_id}")
@@ -79,7 +103,12 @@ def provision(db: Session, *, as_of: date | None = None) -> dict:
         end = start + timedelta(days=2)
         if end.month != start.month:
             raise RuntimeError(f"Demo leave crosses the calendar month: {spec.zup_id}")
+        if any(start <= prior_end and end >= prior_start for prior_start, prior_end in planned_periods.get(owner.id, ())):
+            raise RuntimeError(f"Demo leave periods overlap for {spec.zup_id}")
+        planned_periods.setdefault(owner.id, []).append((start, end))
         key = f"jana-people-leave-v1-{months[0]:%Y-%m}-{spec.zup_id}"
+        if spec.code:
+            key += f"-{spec.code}"
         existing = db.scalar(select(LeaveRequest).where(LeaveRequest.employee_id == owner.id,
             LeaveRequest.idempotency_key == key))
         if existing is not None:
@@ -93,6 +122,10 @@ def provision(db: Session, *, as_of: date | None = None) -> dict:
         if overlap is not None:
             raise RuntimeError(f"Existing leave overlaps demo period for {spec.zup_id}")
         prepared.append((spec, owner, manager, start, end, key, False))
+
+    keys = [row[5] for row in prepared]
+    if len(set(keys)) != len(keys):
+        raise RuntimeError("Duplicate synthetic leave command keys")
 
     created = 0
     for spec, owner, manager, start, end, key, exists in prepared:
@@ -109,10 +142,12 @@ def provision(db: Session, *, as_of: date | None = None) -> dict:
         if spec.status == "approved" and item.status == "manager_approved":
             item = decide(item.id, RequestDecision(status="approved", version=item.version,
                 comment="DEMO / SYNTHETIC · Финальное решение HR"), hr, db)
+        if spec.status == "rejected" and item.status == "manager_approved":
+            item = decide(item.id, RequestDecision(status="rejected", version=item.version,
+                comment="DEMO / SYNTHETIC · Решение HR"), hr, db)
         if item.status != spec.status:
             raise RuntimeError(f"Unexpected workflow state for {spec.zup_id}: {item.status}")
 
-    keys = [row[5] for row in prepared]
     rows = db.execute(select(LeaveRequest.status, Employee.department).join(Employee,
         Employee.id == LeaveRequest.employee_id).where(LeaveRequest.idempotency_key.in_(keys))).all()
     return {"month": months[0].strftime("%Y-%m"), "created": created,
