@@ -1,0 +1,53 @@
+# Local equivalent of render.yaml. This file is not executed by Render.
+# Separate project/volumes keep the regular development Compose stack intact.
+name: digital-hr-render-local
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: jana
+      POSTGRES_USER: jana
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Generate .env with scripts/setup_env.py}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jana -d jana"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    init: true
+    environment:
+      DATABASE_URL: postgresql://jana:${POSTGRES_PASSWORD:?Generate .env with scripts/setup_env.py}@postgres:5432/jana
+      JWT_SECRET: ${JWT_SECRET:?Generate .env with scripts/setup_env.py}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:?Generate .env with scripts/setup_env.py}
+      ZUP_MODE: mock
+      DOCUMENTOLOG_MODE: mock
+      LLM_PROVIDER: disabled
+      DATA_DIR: /var/data
+      PORT: "10000"
+      RENDER_EXTERNAL_URL: http://localhost:${RENDER_WEB_PORT:-10000}
+    ports:
+      - "127.0.0.1:${RENDER_WEB_PORT:-10000}:10000"
+    volumes:
+      - mock_data:/var/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:10000/api/health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      start_period: 300s
+      retries: 30
+
+volumes:
+  postgres_data:
+  mock_data:

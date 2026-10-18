@@ -9,6 +9,7 @@
 - [Контракт API](api-contract.md)
 - [Архитектура](architecture.md)
 - [Проверки и ограничения](verification.md)
+- [Запуск на Render: Blueprint и Docker](render.md)
 - [Аудит по критериям кейса 2](audit-case-02.md)
 - [Сценарий демонстрации](demo-scenarios.md)
 - [Опциональный LLM для AI Jana](ai-jana-llm.md)

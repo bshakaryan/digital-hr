@@ -6,7 +6,9 @@
 
 ## Запуск в Docker
 
-Для Render и других хостингов одного Docker-сервиса добавлен корневой `Dockerfile`: сборка из корня запускает весь mock-прототип на `$PORT`. Задайте `JWT_SECRET` и `DEMO_PASSWORD`, для постоянного хранения подключите диск `/var/data`. Точные настройки — [один сервис на Render](docs/deployment.md#один-docker-сервис-на-render).
+Для Render подготовлен [`render.yaml`](render.yaml): **New → Blueprint → bshakaryan/digital-hr → main → Deploy Blueprint**. Он создаёт Docker Web Service, PostgreSQL и диск `/var/data`, автоматически связывает `DATABASE_URL` и генерирует секреты. Это платные ресурсы; стоимость показывается перед запуском. Пароль демо-аккаунтов доступен в Environment Web Service как `DEMO_PASSWORD`. Полная [инструкция Render](docs/render.md) включает обновления и переход с существующего сервиса.
+
+Render использует Blueprint вместо `docker compose up`. Локальный эквивалент этого деплоя запускается через [`compose.render.yaml`](compose.render.yaml); обычный Compose ниже сохраняет отдельные контейнеры всех сервисов. Корневой `Dockerfile` также можно настроить вручную с внешним PostgreSQL: [настройки одного сервиса](docs/deployment.md#один-docker-web-service-и-внешний-postgresql-на-render).
 
 Готовые образы для переноса на сервер собираются командой `./scripts/build-deploy.sh` (по умолчанию Linux `amd64`). Архив в `dist/` включает образы, Compose и `deploy.sh`; инструкция — [Docker-деплой](docs/deployment.md).
 
