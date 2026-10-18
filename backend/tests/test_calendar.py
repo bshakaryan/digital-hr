@@ -68,11 +68,34 @@ def test_calendar_filters_active_statuses_and_inclusive_month_boundaries(api):
         "2028-04": [],
     }
     for month, statuses in expected.items():
-        response = api.get(f"/api/calendar?month={month}")
+        response = api.get(f"/api/calendar?month={month}", "outsider")
         assert response.status_code == 200
         actual = {row["id"] for row in response.json()["absences"] if row["employee_id"] == 4}
         assert actual == {ids[status] for status in statuses}
         assert len(response.json()["employees"]) == 4
+
+
+def test_colleague_pending_leave_is_hidden_but_owner_and_reviewer_can_see_it(api):
+    from app.models import LeaveRequest
+
+    with api.db.session() as db:
+        pending = LeaveRequest(employee_id=1, start_date=date(2028, 4, 10), end_date=date(2028, 4, 12),
+            status="submitted", comment="Private pending reason", idempotency_key="calendar-private-pending", payload_hash="test")
+        approved = LeaveRequest(employee_id=4, start_date=date(2028, 4, 15), end_date=date(2028, 4, 17),
+            status="approved", idempotency_key="calendar-public-approved", payload_hash="test")
+        db.add_all([pending, approved])
+        db.commit()
+        pending_id, approved_id = pending.id, approved.id
+
+    colleague = api.get("/api/calendar?month=2028-04", "outsider")
+    assert colleague.status_code == 200
+    assert {row["id"] for row in colleague.json()["absences"]} == {approved_id}
+    assert str(pending_id) not in [str(row["id"]) for row in colleague.json()["absences"]]
+    assert "Private pending reason" not in colleague.text
+    assert pending_id in {row["id"] for row in api.get("/api/calendar?month=2028-04", "employee").json()["absences"]}
+    reviewer_rows = api.get("/api/calendar?month=2028-04", "manager").json()["absences"]
+    assert pending_id in {row["id"] for row in reviewer_rows}
+    assert next(row for row in reviewer_rows if row["id"] == pending_id)["can_open_request"]
 
 
 def test_calendar_requires_authentication_and_valid_month(api):

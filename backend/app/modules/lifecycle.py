@@ -64,9 +64,9 @@ def save_command(db, user, key, digest, result_id):
 def inform(db, item, user, title, comment, include_final_reviewers=False):
     owner = db.get(Employee, item.employee_id)
     recipients = {owner.id}
-    if owner.manager_id:
+    if owner.manager_id and owner.role != "hr_admin":
         recipients.add(owner.manager_id)
-    if include_final_reviewers:
+    if include_final_reviewers or owner.role == "hr_admin":
         recipients.update(final_reviewer_ids(db, owner))
     for employee_id in recipients:
         notify(db, employee_id, "request_lifecycle", title, f"Заявка №{item.id} · {owner.full_name}. {comment}", entity_type="request", entity_id=item.id, actor_id=user.id)

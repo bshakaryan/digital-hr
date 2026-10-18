@@ -90,6 +90,12 @@ def test_manager_and_hr_requests_have_one_independent_approval_stage(
 ):
     from app.models import AuditEvent, LeaveDeduction, RequestHistory
 
+    if author == "hr":
+        from app.models import Employee
+        with api.db.session() as db:
+            db.get(Employee, author_id).manager_id = reviewer_id
+            db.commit()
+
     initial_balance = api.get("/api/me", author).json()["leave_balance"]
     item = api.leave(author, key=f"one-stage-{author}")
     assert item["approval_route"] == route
@@ -136,6 +142,43 @@ def test_unrelated_manager_cannot_see_or_decide_outsider_request(api):
     assert api.decide(outsider, "manager").status_code == 404
     assert api.decide(employee, "outsider").status_code == 404
     assert api.db.snapshot() == before
+
+
+def test_hr_request_requires_designated_manager_and_excludes_unrelated_manager(api):
+    from app.models import Employee, Notification
+
+    api.headers("hr")
+    before = api.db.snapshot()
+    missing = api.create("hr", key="hr-without-reviewer")
+    assert missing.status_code == 409
+    assert "не назначен независимый руководитель" in missing.json()["detail"]
+    assert api.db.snapshot() == before
+
+    with api.db.session() as db:
+        db.get(Employee, 3).manager_id = 2
+        db.get(Employee, 4).role = "manager"
+        db.commit()
+
+    item = api.leave("hr", key="hr-with-designated-reviewer")
+    request_id = item["id"]
+    with api.db.session() as db:
+        old_notification = Notification(employee_id=4, kind="request_manager_review", title="Old HR request",
+            body="Previously sent to every manager", entity_type="request", entity_id=request_id, actor_id=3)
+        db.add(old_notification)
+        db.commit()
+        old_notification_id = old_notification.id
+    assert request_id not in {row["id"] for row in api.get("/api/requests", "outsider").json()}
+    assert request_id not in {row["id"] for row in api.get("/api/requests/review-queue", "outsider").json()}
+    assert api.get(f"/api/requests/{request_id}", "outsider").status_code == 404
+    assert api.decide(item, "outsider").status_code == 404
+    assert not [row for row in api.get("/api/notifications", "outsider").json() if row["entity_id"] == request_id]
+    assert api.patch(f"/api/notifications/{old_notification_id}/read", actor="outsider").status_code == 404
+
+    detail = api.get(f"/api/requests/{request_id}", "manager")
+    assert detail.status_code == 200 and detail.json()["can_review"]
+    assert request_id in {row["id"] for row in api.get("/api/requests/review-queue", "manager").json()}
+    assert [row for row in api.get("/api/notifications", "manager").json() if row["entity_id"] == request_id]
+    assert api.decide(item, "manager").status_code == 200
 
 
 def test_manager_approval_then_hr_approval_has_ordered_history_and_effects(api):

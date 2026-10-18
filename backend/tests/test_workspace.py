@@ -137,6 +137,12 @@ def test_cancellation_requires_hr_and_refunds_once(api):
 
 
 def test_hr_leave_cancellation_is_decided_by_manager(api):
+    from app.models import Employee
+
+    with api.db.session() as db:
+        db.get(Employee, 3).manager_id = 2
+        db.get(Employee, 4).role = "manager"
+        db.commit()
     initial = api.get("/api/me", "hr").json()["leave_balance"]
     item = api.decide(api.leave("hr", key="hr-one-stage"), "manager").json()
     assert item["status"] == "approved"
@@ -146,6 +152,9 @@ def test_hr_leave_cancellation_is_decided_by_manager(api):
     assert pending["approval_route"] == "hr_to_manager"
     assert pending["can_review"] is False
     assert pending["id"] in {row["id"] for row in api.get("/api/requests/review-queue", "manager").json()}
+    assert pending["id"] not in {row["id"] for row in api.get("/api/requests/review-queue", "outsider").json()}
+    assert act(api, pending, "cancellation-decision", "outsider", key="unrelated-hr-cancel", status="approved").status_code == 404
+    assert not [row for row in api.get("/api/notifications", "outsider").json() if row["entity_id"] == pending["id"]]
     assert act(api, pending, "cancellation-decision", "hr", key="hr-self-cancel", status="approved").status_code == 403
 
     result = act(api, pending, "cancellation-decision", "manager", key="hr-cancel-decision", status="approved")
