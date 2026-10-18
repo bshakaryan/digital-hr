@@ -1,4 +1,21 @@
 .dashboard { --academy-ink: #183527; --academy-green: #008c00; --academy-line: #dce8dc; color: var(--academy-ink); }
+.destinationNav { display: flex; flex-wrap: wrap; gap: 7px; margin: 18px 0 22px; padding: 5px; width: fit-content; max-width: 100%; border: 1px solid #dce8dc; border-radius: 15px; background: #f4f8f2; }
+.destinationTab { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 42px; padding: 9px 16px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: #526b58; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: background-color .18s ease, color .18s ease; }
+.destinationTab:hover { color: #176a2b; background: #eaf4e8; }
+.destinationActive { border-color: #d4e6d1; background: #fff; color: #176a2b; box-shadow: 0 3px 10px #1b4d190d; }
+.destinationCount { display: grid; place-items: center; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 99px; background: #e9f3e7; color: #28753b; font-size: 11px; }
+.destinationTab:focus-visible, .subNav button:focus-visible, .catalogOpen:focus-visible { outline: 2px solid #008c00; outline-offset: 2px; }
+.destinationPanel { animation: reveal .18s ease-out; }
+@keyframes reveal { from { opacity: .65; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+.viewIntro { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 21px 25px; border: 1px solid #dce8dc; border-radius: 18px; background: linear-gradient(110deg, #eef7ec, #fff); }
+.viewIntro h2 { margin: 4px 0 5px; font-size: clamp(21px, 2.5vw, 27px); letter-spacing: -.025em; }
+.viewIntro p { max-width: 640px; margin: 0; color: #607564; font-size: 12px; line-height: 1.55; }
+.viewIntro > strong { flex: none; padding: 10px 13px; border: 1px solid #dce9da; border-radius: 12px; background: #fff; color: #176d2d; font-size: 18px; white-space: nowrap; }
+.viewIntro > strong span { display: block; color: #687a6a; font-size: 10px; font-weight: 500; }
+.subNav { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 9px; border-bottom: 1px solid #dce8dc; }
+.subNav button { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 8px 12px; border: 0; border-radius: 9px; background: transparent; color: #63776a; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.subNav button:hover, .subNav .subActive { background: #eaf5e7; color: #126c2b; }
+.subNav button span { font-size: 11px; }
 .eyebrow { color: #438550; font-size: 10px; font-weight: 800; letter-spacing: .14em; }
 .hero { display: flex; align-items: center; justify-content: space-between; gap: 32px; padding: 30px 34px; margin: 18px 0 16px; border: 1px solid #d5e5d6; border-radius: 24px; background: linear-gradient(115deg, #e8f5e7 0%, #f8fbf4 72%); }
 .hero h2 { margin: 8px 0 8px; font-size: clamp(23px, 3vw, 32px); line-height: 1.15; letter-spacing: -.035em; }
@@ -37,7 +54,7 @@
 .routeLine i { position: relative; top: -5px; width: 8px; height: 8px; border-radius: 50%; background: #80ad89; }
 .routeLine i:last-child { background: #008c00; }
 .assigned :global(.course-card-body) { display: flex; flex-direction: column; flex: 1; padding: 20px; }
-.assigned :global(.course-card h2) { min-height: 0; margin: 14px 0 8px; color: #1a3323; font-size: 17px; line-height: 1.35; }
+.assigned :global(.course-card h3) { min-height: 0; margin: 14px 0 8px; color: #1a3323; font-size: 17px; line-height: 1.35; }
 .assigned :global(.course-card-body > p) { flex: 1; min-height: 0; margin: 0; color: #647468; font-size: 12px; line-height: 1.65; }
 .assigned :global(.academy-course-status) { display: flex; align-items: center; justify-content: space-between; gap: 7px; }
 .assigned :global(.academy-course-status small) { color: #829083; font-size: 9px; white-space: nowrap; }
@@ -52,6 +69,7 @@
 .catalog :global(.academy-catalog-card footer) { padding-top: 14px; border-top: 1px solid #edf1eb; }
 .catalogOpen { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: transparent; color: #08762b; font: inherit; font-weight: 750; cursor: pointer; }
 .catalogOpen:hover { text-decoration: underline; }
+.catalogOpen:disabled { opacity: .5; cursor: wait; text-decoration: none; }
 .reader :global(.course-reader-heading) { background: linear-gradient(105deg, #f3faf1, #fff); }
 .reader :global(.course-reader-heading h2) { color: #183527; letter-spacing: -.025em; }
 .readerSteps { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
@@ -71,6 +89,21 @@
 .admin :global(.academy-step-heading) { padding-bottom: 13px; border-bottom: 1px solid #e8efe6; }
 .admin :global(.academy-admin-grid textarea) { min-height: 105px; }
 .admin :global(.academy-admin-grid input:focus-visible), .admin :global(.academy-admin-grid textarea:focus-visible) { outline: 2px solid #008c00; outline-offset: 2px; }
+.admin :global(.academy-admin-grid) .enrollmentSetting { grid-column: 1 / -1; display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid #dce8dc; border-radius: 11px; background: #f7fbf5; cursor: pointer; }
+.admin :global(.academy-admin-grid) .enrollmentSetting input { flex: none; width: 16px; height: 16px; min-height: 0; margin: 2px 0 0; accent-color: #008c00; }
+.enrollmentSetting span { display: grid; gap: 3px; }
+.enrollmentSetting small { color: #647967; font-size: 11px; line-height: 1.4; }
+.admin :global(.academy-assignment-search select) { width: 100%; min-height: 42px; padding: 10px 12px; border: 1px solid #d4dfd1; border-radius: 9px; background: #fff; color: #253326; font: inherit; }
+.legacyReview { margin-top: 22px; padding-top: 18px; border-top: 1px solid #e3ece0; }
+.legacyReview h4 { margin: 0 0 5px; font-size: 14px; }
+.legacyReview p { margin: 0 0 13px; color: #647667; font-size: 11px; line-height: 1.5; }
+.legacyReview ul { display: grid; gap: 8px; padding: 0; margin: 0; list-style: none; }
+.legacyReview li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid #e1eae0; border-radius: 11px; background: #fff; }
+.legacyReview li > span { display: grid; gap: 2px; flex: 1; min-width: 130px; }
+.legacyReview li strong { font-size: 12px; }
+.legacyReview li small { color: #718073; font-size: 10px; }
+.legacyReview select { min-height: 37px; padding: 7px 9px; border: 1px solid #d4dfd1; border-radius: 8px; background: #fff; font: inherit; font-size: 11px; }
+.legacyReview .legacyEmpty { margin: 0; }
 @media (max-width: 850px) { .hero { align-items: stretch; flex-direction: column; } .heroStats > div { flex: 1; } }
-@media (max-width: 640px) { .hero { padding: 22px; gap: 20px; } .heroStats { gap: 5px; } .heroStats > div { min-width: 0; padding: 11px; } .heroStats strong { font-size: 22px; } .heroStats span { font-size: 10px; } .rewards { align-items: flex-start; gap: 12px; padding: 16px; } .levelMark { width: 54px; height: 54px; } .rewardHeading { align-items: flex-start; flex-direction: column; gap: 0; } .rewardHeading > strong { padding: 0 0 9px; white-space: normal; } .assigned :global(.academy-section-heading h2), .catalog :global(.academy-section-heading h2) { font-size: 21px; } .readerSteps { display: none; } .reader :global(.course-documents li) { flex-wrap: wrap; } .reader :global(.course-documents li .button) { width: 100%; } }
-@media (prefers-reduced-motion: reduce) { .assigned :global(.course-card) { transition: none; } }
+@media (max-width: 640px) { .destinationNav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; } .destinationTab { min-width: 0; padding: 9px 7px; font-size: 11px; } .viewIntro { align-items: flex-start; flex-direction: column; padding: 18px; } .viewIntro > strong { align-self: flex-start; } .hero { padding: 22px; gap: 20px; } .heroStats { gap: 5px; } .heroStats > div { min-width: 0; padding: 11px; } .heroStats strong { font-size: 22px; } .heroStats span { font-size: 10px; } .rewards { align-items: flex-start; gap: 12px; padding: 16px; } .levelMark { width: 54px; height: 54px; } .rewardHeading { align-items: flex-start; flex-direction: column; gap: 0; } .rewardHeading > strong { padding: 0 0 9px; white-space: normal; } .assigned :global(.academy-section-heading h2), .catalog :global(.academy-section-heading h2) { font-size: 21px; } .readerSteps { display: none; } .reader :global(.course-documents li) { flex-wrap: wrap; } .reader :global(.course-documents li .button) { width: 100%; } .legacyReview li { flex-wrap: wrap; } .legacyReview select { flex: 1; min-width: 150px; } }
+@media (prefers-reduced-motion: reduce) { .destinationPanel { animation: none; } .destinationTab, .assigned :global(.course-card) { transition: none; } }
