@@ -170,6 +170,7 @@ class Course(Base):
     objectives: Mapped[str] = mapped_column(Text, default="", server_default="")
     status: Mapped[str] = mapped_column(String(20), default="published", server_default="published")
     category: Mapped[str] = mapped_column(String(30), default="general", server_default="general")
+    self_enrollable: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     demo_code: Mapped[str | None] = mapped_column(String(40), unique=True)
 
 
@@ -178,6 +179,7 @@ class CourseAssignment(Base):
     __table_args__ = (
         UniqueConstraint("employee_id", "course_id", name="uq_course_assignment"),
         CheckConstraint("progress >= 0 AND progress <= 100", name="ck_course_progress"),
+        CheckConstraint("learning_track IN ('onboarding', 'development', 'legacy')", name="ck_course_assignment_learning_track"),
     )
     id: Mapped[int] = mapped_column(primary_key=True)
     employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id"))
@@ -185,6 +187,7 @@ class CourseAssignment(Base):
     progress: Mapped[int] = mapped_column(Integer, default=0)
     completed: Mapped[bool] = mapped_column(Boolean, default=False)
     deadline: Mapped[date | None] = mapped_column(Date)
+    learning_track: Mapped[str] = mapped_column(String(20), default="legacy", server_default="legacy")
 
 
 class KnowledgeDocument(Base):

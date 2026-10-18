@@ -40,7 +40,8 @@ def rows_for(db: Session, employees: list[Employee], as_of: date) -> list[dict]:
         completion = [event.created_at for event in history if event.action == "course.completed"]
         rows.append({"employee_id": employee.id, "employee_name": employee.full_name,
             "department": employee.department, "course_id": course.id, "course_title": course.title,
-            "category": course.category, "progress": assignment.progress, "deadline": assignment.deadline,
+            "category": course.category, "learning_track": assignment.learning_track,
+            "progress": assignment.progress, "deadline": assignment.deadline,
             "status": status, "overdue": overdue,
             "completed_at": min(completion) if completion else None,
             "last_activity_at": max((event.created_at for event in history), default=None)})

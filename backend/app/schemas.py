@@ -153,6 +153,9 @@ class NotificationOut(BaseModel):
     actor_name: str | None = None
 
 
+LearningTrack = Literal["onboarding", "development", "legacy"]
+
+
 class CourseOut(BaseModel):
     id: int
     title: str
@@ -167,6 +170,8 @@ class CourseOut(BaseModel):
     status: Literal["draft", "published"] = "published"
     category: str = "general"
     is_demo: bool = False
+    self_enrollable: bool = False
+    learning_track: LearningTrack = "legacy"
     deadline: date | None = None
     learning_status: Literal["completed", "in_progress", "not_started"] = "not_started"
     overdue: bool = False
@@ -178,6 +183,7 @@ class CourseDraft(Input):
     objectives: str = Field(min_length=1, max_length=2000)
     duration_minutes: int = Field(default=10, ge=1, le=480, strict=True)
     category: Literal["general", "onboarding", "logistics", "warehouse_safety", "customer_service"] | None = None
+    self_enrollable: bool | None = Field(default=None, strict=True)
 
     @model_validator(mode="after")
     def nonempty(self):
@@ -204,6 +210,11 @@ class CourseQuiz(Input):
 class CourseAssign(Input):
     employee_id: int = Field(gt=0, strict=True)
     deadline: date | None = None
+    learning_track: LearningTrack = "legacy"
+
+
+class CourseTrackChange(Input):
+    learning_track: Literal["onboarding", "development"]
 
 
 class RewardsOut(BaseModel):
@@ -269,6 +280,7 @@ class CourseCatalogItem(BaseModel):
     correct_index: int = 0
     category: str = "general"
     is_demo: bool = False
+    self_enrollable: bool = False
 
 
 class PublicCourseItem(BaseModel):
@@ -279,6 +291,7 @@ class PublicCourseItem(BaseModel):
     duration_minutes: int
     category: str
     is_demo: bool
+    self_enrollable: bool = False
 
 
 class LearningAssignmentOut(BaseModel):
@@ -288,6 +301,7 @@ class LearningAssignmentOut(BaseModel):
     course_id: int
     course_title: str
     category: str
+    learning_track: LearningTrack = "legacy"
     progress: int
     deadline: date | None
     status: Literal["completed", "in_progress", "not_started"]

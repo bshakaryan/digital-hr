@@ -61,12 +61,14 @@ export interface Course {
   progress: number; completed: boolean; question: string; options: string[];
   objectives: string; status: "draft" | "published"; category: CourseCategory; is_demo: boolean;
   deadline: string | null; learning_status: LearningStatus; overdue: boolean;
+  learning_track: LearningTrack; self_enrollable: boolean;
 }
 export type CourseCategory = "general" | "onboarding" | "logistics" | "warehouse_safety" | "customer_service";
 export type LearningStatus = "completed" | "in_progress" | "not_started";
+export type LearningTrack = "onboarding" | "development" | "legacy";
 export interface PublicCourse {
   id: number; title: string; description: string; objectives: string;
-  duration_minutes: number; category: CourseCategory; is_demo: boolean;
+  duration_minutes: number; category: CourseCategory; is_demo: boolean; self_enrollable: boolean;
 }
 export interface AcademyRewards { xp: number; level: number; next_level_xp: number; badges: string[] }
 export interface Knowledge {
@@ -85,11 +87,11 @@ export interface KnowledgeFile {
 export interface CourseCatalogItem {
   id: number; title: string; description: string; objectives: string; duration_minutes: number;
   status: "draft" | "published"; question: string; options: string[]; correct_index: number;
-  category: CourseCategory; is_demo: boolean;
+  category: CourseCategory; is_demo: boolean; self_enrollable: boolean;
 }
 export interface LearningAssignment {
   employee_id: number; employee_name: string; department: string; course_id: number; course_title: string;
-  category: CourseCategory; progress: number; deadline: string | null; status: LearningStatus;
+  category: CourseCategory; learning_track: LearningTrack; progress: number; deadline: string | null; status: LearningStatus;
   overdue: boolean; completed_at: string | null; last_activity_at: string | null;
 }
 export interface EmployeeLearning {

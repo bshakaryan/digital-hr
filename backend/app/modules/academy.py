@@ -11,7 +11,7 @@ from app.modules.assistant import answer_from_documents, without_frontmatter
 from app.modules.audit import record
 from app.modules.knowledge_files import _present
 from app.modules.notifications import notify
-from app.schemas import AssistantOut, AttachMaterial, Completion, CourseAssign, CourseCatalogItem, CourseDraft, CourseOut, CourseQuiz, EmployeeLearningOut, KnowledgeFileOut, LearningAnalyticsOut, Progress, PublicCourseItem, Question, RewardsOut
+from app.schemas import AssistantOut, AttachMaterial, Completion, CourseAssign, CourseCatalogItem, CourseDraft, CourseOut, CourseQuiz, CourseTrackChange, EmployeeLearningOut, KnowledgeFileOut, LearningAnalyticsOut, Progress, PublicCourseItem, Question, RewardsOut
 from app.security import current_user, require_hr
 
 router = APIRouter(prefix="/courses", tags=["academy"])
@@ -26,14 +26,14 @@ def assigned(db: Session, employee_id: int, course_id: int):
 
 def present(course: Course, assignment: CourseAssignment):
     learning_status, overdue = assignment_status(assignment, reference_date())
-    return CourseOut(id=course.id, title=course.title, description=course.description, content=course.content, duration_minutes=course.duration_minutes, progress=assignment.progress, completed=assignment.completed, question=course.question, options=json.loads(course.options_json), objectives=course.objectives, status=course.status, category=course.category, is_demo=course.demo_code is not None, deadline=assignment.deadline, learning_status=learning_status, overdue=overdue)
+    return CourseOut(id=course.id, title=course.title, description=course.description, content=course.content, duration_minutes=course.duration_minutes, progress=assignment.progress, completed=assignment.completed, question=course.question, options=json.loads(course.options_json), objectives=course.objectives, status=course.status, category=course.category, is_demo=course.demo_code is not None, self_enrollable=course.self_enrollable, learning_track=assignment.learning_track, deadline=assignment.deadline, learning_status=learning_status, overdue=overdue)
 
 
 def admin_course(course: Course):
     return CourseCatalogItem(id=course.id, title=course.title, description=course.description,
         objectives=course.objectives, duration_minutes=course.duration_minutes, status=course.status,
         question=course.question, options=json.loads(course.options_json), correct_index=course.correct_index,
-        category=course.category, is_demo=course.demo_code is not None)
+        category=course.category, is_demo=course.demo_code is not None, self_enrollable=course.self_enrollable)
 
 
 def editable_course(db: Session, course_id: int) -> Course:
@@ -73,7 +73,8 @@ def discover_courses(user: Employee = Depends(current_user), db: Session = Depen
         .distinct().order_by(Course.id)).all()
     return [PublicCourseItem(id=item.id, title=item.title, description=item.description,
         objectives=item.objectives, duration_minutes=item.duration_minutes,
-        category=item.category, is_demo=item.demo_code is not None) for item in courses]
+        category=item.category, is_demo=item.demo_code is not None,
+        self_enrollable=item.self_enrollable) for item in courses]
 
 
 @router.get("/analytics", response_model=LearningAnalyticsOut)
@@ -106,7 +107,8 @@ def learning_employee(employee_id: int, user: Employee = Depends(current_user), 
 def create_course_record(data: CourseDraft, user: Employee, db: Session, demo_code: str | None = None) -> Course:
     item = Course(title=data.title.strip(), description=data.description.strip(), objectives=data.objectives.strip(),
         content="", duration_minutes=data.duration_minutes, question="", options_json="[]", correct_index=0,
-        status="draft", category=data.category or "general", demo_code=demo_code)
+        status="draft", category=data.category or "general", demo_code=demo_code,
+        self_enrollable=data.self_enrollable if data.self_enrollable is not None else False)
     db.add(item)
     db.flush()
     record(db, user.id, "course.created", "course", item.id)
@@ -123,10 +125,11 @@ def create_course(data: CourseDraft, user: Employee = Depends(require_hr), db: S
 @router.patch("/{course_id}", response_model=CourseCatalogItem)
 def edit_course(course_id: int, data: CourseDraft, user: Employee = Depends(require_hr), db: Session = Depends(get_db)):
     item = editable_course(db, course_id)
-    values = (data.title.strip(), data.description.strip(), data.objectives.strip(), data.duration_minutes, data.category or item.category)
-    old = (item.title, item.description, item.objectives, item.duration_minutes, item.category)
+    values = (data.title.strip(), data.description.strip(), data.objectives.strip(), data.duration_minutes,
+        data.category or item.category, item.self_enrollable if data.self_enrollable is None else data.self_enrollable)
+    old = (item.title, item.description, item.objectives, item.duration_minutes, item.category, item.self_enrollable)
     if values != old:
-        item.title, item.description, item.objectives, item.duration_minutes, item.category = values
+        item.title, item.description, item.objectives, item.duration_minutes, item.category, item.self_enrollable = values
         record(db, user.id, "course.updated", "course", item.id)
         db.commit()
     return admin_course(item)
@@ -181,12 +184,54 @@ def assign_course(course_id: int, data: CourseAssign, user: Employee = Depends(r
         .where(CourseMaterial.course_id == course_id, KnowledgeFile.access_scope.in_(("all", employee.role))).limit(1))
     if readable is None:
         raise HTTPException(409, "У сотрудника нет доступа к материалам курса")
-    db.add(CourseAssignment(employee_id=employee.id, course_id=course_id, progress=0, completed=False, deadline=data.deadline))
+    db.add(CourseAssignment(employee_id=employee.id, course_id=course_id, progress=0, completed=False,
+        deadline=data.deadline, learning_track=data.learning_track))
     notify(db, employee.id, "course_assigned", "Вам назначен курс", f"Начните с курса «{item.title}».",
         entity_type="course", entity_id=course_id, actor_id=user.id)
     record(db, user.id, "course.assigned", "employee", employee.id)
     db.commit()
     return {"course_id": course_id, "employee_id": employee.id, "assigned": True}
+
+
+@router.patch("/{course_id}/assignments/{employee_id}/track")
+def reclassify_assignment(course_id: int, employee_id: int, data: CourseTrackChange,
+                          user: Employee = Depends(require_hr), db: Session = Depends(get_db)):
+    assignment = db.scalar(select(CourseAssignment).where(CourseAssignment.course_id == course_id,
+        CourseAssignment.employee_id == employee_id).with_for_update())
+    if assignment is None:
+        raise HTTPException(404, "Назначение не найдено")
+    if assignment.learning_track == data.learning_track:
+        return {"course_id": course_id, "employee_id": employee_id, "learning_track": assignment.learning_track, "changed": False}
+    if assignment.learning_track != "legacy":
+        raise HTTPException(409, "Трек уже установлен; изменение требует отдельного решения HR")
+    assignment.learning_track = data.learning_track
+    record(db, user.id, "course.assignment_reclassified", "course_assignment", assignment.id)
+    db.commit()
+    return {"course_id": course_id, "employee_id": employee_id, "learning_track": assignment.learning_track, "changed": True}
+
+
+@router.post("/{course_id}/enroll")
+def self_enroll(course_id: int, user: Employee = Depends(current_user), db: Session = Depends(get_db)):
+    item = db.scalar(select(Course).where(Course.id == course_id).with_for_update())
+    if item is None or item.status != "published":
+        raise HTTPException(404, "Курс не найден")
+    existing = db.scalar(select(CourseAssignment).where(CourseAssignment.course_id == course_id,
+        CourseAssignment.employee_id == user.id))
+    if existing is not None:
+        return {"course_id": course_id, "employee_id": user.id, "assigned": False,
+            "learning_track": existing.learning_track}
+    if not item.self_enrollable:
+        raise HTTPException(409, "Самостоятельная запись на курс закрыта")
+    readable = db.scalar(select(CourseMaterial.id).join(KnowledgeFile, CourseMaterial.file_id == KnowledgeFile.id)
+        .where(CourseMaterial.course_id == course_id, KnowledgeFile.access_scope.in_(("all", user.role))).limit(1))
+    if readable is None:
+        raise HTTPException(404, "Курс не найден")
+    db.add(CourseAssignment(employee_id=user.id, course_id=course_id, progress=0, completed=False,
+        learning_track="development"))
+    record(db, user.id, "course.self_enrolled", "course", course_id)
+    db.commit()
+    return {"course_id": course_id, "employee_id": user.id, "assigned": True,
+        "learning_track": "development"}
 
 
 @router.get("/{course_id}", response_model=CourseOut)
