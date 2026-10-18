@@ -8,6 +8,7 @@ from app.database import get_db
 from app.models import Course, CourseAssignment, CourseMaterial, Employee, KnowledgeDocument, KnowledgeFile
 from app.modules.academy_analytics import assignment_status, employee_profile, overview, reference_date, rows_for
 from app.modules.assistant import answer_from_documents, without_frontmatter
+from app.modules.assistant_conversations import reply
 from app.modules.audit import record
 from app.modules.knowledge_files import _present
 from app.modules.notifications import notify
@@ -267,12 +268,16 @@ def complete(course_id: int, data: Completion, user: Employee = Depends(current_
     return present(c, a)
 
 
-@router.post("/{course_id}/ask", response_model=AssistantOut)
+@router.post("/{course_id}/ask", response_model=AssistantOut, response_model_exclude_none=True)
 def ask_course(course_id: int, data: Question, user: Employee = Depends(current_user), db: Session = Depends(get_db)):
     assigned(db, user.id, course_id)
-    documents = db.scalars(select(KnowledgeDocument).join(CourseMaterial, CourseMaterial.file_id == KnowledgeDocument.file_id)
-        .where(CourseMaterial.course_id == course_id, KnowledgeDocument.access_scope.in_(("all", user.role)))).all()
-    return answer_from_documents(data.question, without_frontmatter(documents), source_type="course", min_score=0.25)
+    def answer():
+        documents = db.scalars(select(KnowledgeDocument).join(CourseMaterial, CourseMaterial.file_id == KnowledgeDocument.file_id)
+            .join(KnowledgeFile, KnowledgeFile.id == KnowledgeDocument.file_id)
+            .where(CourseMaterial.course_id == course_id, KnowledgeDocument.access_scope.in_(("all", user.role)),
+                   KnowledgeFile.access_scope.in_(("all", user.role)))).all()
+        return answer_from_documents(data.question, without_frontmatter(documents), source_type="course", min_score=0.25), "rag"
+    return reply(db, user, data.question, data.conversation_id, data.client_turn_id, course_id, answer)
 
 
 @router.get("/{course_id}/materials", response_model=list[KnowledgeFileOut])

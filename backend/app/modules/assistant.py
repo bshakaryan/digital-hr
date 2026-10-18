@@ -1,16 +1,17 @@
 import re
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.config import get_settings
-from app.models import Employee, KnowledgeDocument
+from app.models import Employee, KnowledgeDocument, KnowledgeFile
 from app.modules.assistant_llm import generate_answer
+from app.modules.assistant_conversations import conversation_detail, list_conversations, reply
 from app.modules.knowledge_files import authorized_file_metadata
 from app.modules.retrieval import ACTION_EQUIVALENTS, concepts, evidence, ranked, supports, terms
-from app.schemas import AssistantOut, Question, Source
+from app.schemas import AssistantOut, ConversationDetail, ConversationPage, Question, Source
 from app.security import current_user
 
 router = APIRouter(tags=["assistant"])
@@ -52,7 +53,9 @@ def refusal_answer() -> AssistantOut:
 def allowed_documents(db: Session, user: Employee):
     # Filter BEFORE retrieval. Restricted text never enters the answer context.
     scopes = ["all", user.role]
-    documents = db.scalars(select(KnowledgeDocument).where(KnowledgeDocument.access_scope.in_(scopes))).all()
+    documents = db.scalars(select(KnowledgeDocument).outerjoin(KnowledgeFile,
+        KnowledgeFile.id == KnowledgeDocument.file_id).where(KnowledgeDocument.access_scope.in_(scopes),
+        or_(KnowledgeDocument.file_id.is_(None), KnowledgeFile.access_scope.in_(scopes)))).all()
     return without_frontmatter(documents)
 
 
@@ -88,11 +91,25 @@ def knowledge(document_id: int, user: Employee = Depends(current_user), db: Sess
 
 @router.post("/assistant/query", response_model=AssistantOut, response_model_exclude_none=True)
 def query(data: Question, user: Employee = Depends(current_user), db: Session = Depends(get_db)):
-    if inventory_intent(data.question):
-        if UNSUPPORTED.search(data.question.lower().replace("ё", "е")):
-            return refusal_answer()
-        return inventory_answer(db, user)
-    return answer_from_documents(data.question, allowed_documents(db, user))
+    def answer():
+        if inventory_intent(data.question):
+            if UNSUPPORTED.search(data.question.lower().replace("ё", "е")):
+                return refusal_answer(), "rag"
+            return inventory_answer(db, user), "inventory"
+        return answer_from_documents(data.question, allowed_documents(db, user)), "rag"
+    return reply(db, user, data.question, data.conversation_id, data.client_turn_id, None, answer)
+
+
+@router.get("/assistant/conversations", response_model=ConversationPage)
+def conversations(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
+                  user: Employee = Depends(current_user), db: Session = Depends(get_db)):
+    return list_conversations(db, user, page, page_size)
+
+
+@router.get("/assistant/conversations/{conversation_id}", response_model=ConversationDetail)
+def conversation(conversation_id: int, page: int = Query(1, ge=1), page_size: int = Query(30, ge=1, le=100),
+                 user: Employee = Depends(current_user), db: Session = Depends(get_db)):
+    return conversation_detail(db, user, conversation_id, page, page_size)
 
 
 def answer_from_documents(question: str, documents, *, source_type="knowledge", min_score=0.8) -> AssistantOut:

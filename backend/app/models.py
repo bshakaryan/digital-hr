@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 
-from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -230,6 +230,32 @@ class CourseMaterial(Base):
     course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"))
     file_id: Mapped[int] = mapped_column(ForeignKey("knowledge_files.id"))
     attached_by: Mapped[int] = mapped_column(ForeignKey("employees.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class AssistantConversation(Base):
+    __tablename__ = "assistant_conversations"
+    __table_args__ = (Index("ix_assistant_conversations_user_updated", "user_id", "updated_at"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("employees.id"))
+    course_id: Mapped[int | None] = mapped_column(ForeignKey("courses.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class AssistantTurn(Base):
+    __tablename__ = "assistant_turns"
+    __table_args__ = (UniqueConstraint("user_id", "client_turn_id", name="uq_assistant_turn_user_client_id"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(ForeignKey("assistant_conversations.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("employees.id"))
+    client_turn_id: Mapped[str | None] = mapped_column(String(100))
+    question: Mapped[str] = mapped_column(Text)
+    answer: Mapped[str] = mapped_column(Text)
+    source_refs_json: Mapped[str] = mapped_column(Text)
+    answer_kind: Mapped[str] = mapped_column(String(20), default="rag", server_default="rag")
+    escalate_to_hr: Mapped[bool] = mapped_column(Boolean)
+    mode: Mapped[str] = mapped_column(String(30))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

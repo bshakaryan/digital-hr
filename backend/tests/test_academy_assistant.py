@@ -108,7 +108,11 @@ def test_assistant_abstains_on_unknown_private_or_policy_specifics(api, question
     assert answer["sources"] == []
     assert answer["escalate_to_hr"] is True
     assert answer["answer"]
-    assert api.db.snapshot() == before
+    after = api.db.snapshot()
+    for table in before:
+        if table not in ("assistant_conversations", "assistant_turns", "audit_events"):
+            assert after[table] == before[table]
+    assert len(after["assistant_turns"]) == len(before["assistant_turns"]) + 1
 
 
 def test_hr_private_knowledge_is_filtered_before_retrieval(api):
