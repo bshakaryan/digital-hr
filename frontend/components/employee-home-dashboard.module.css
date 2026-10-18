@@ -37,6 +37,14 @@
 .listText strong, .notification strong { overflow: hidden; font-size: 13px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
 .listText small, .notification small { color: var(--muted); font-size: 11px; }
 .listButton > svg, .notification > svg { flex: none; color: #87928a; }
+.reviewButton { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto 17px; }
+.reviewButton .listText strong, .reviewButton .listText small { overflow-wrap: anywhere; white-space: normal; }
+.reviewButton > .listIcon { align-self: start; }
+@media (max-width: 520px) {
+  .reviewButton { grid-template-columns: 38px minmax(0, 1fr) 17px; }
+  .reviewButton > :nth-child(3) { grid-column: 2; justify-self: start; }
+  .reviewButton > svg:last-child { grid-column: 3; grid-row: 1 / span 2; }
+}
 .month { color: var(--muted); font-size: 12px; text-transform: capitalize; white-space: nowrap; }
 .context { margin: -7px 0 13px; }
 .colleagueList { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }

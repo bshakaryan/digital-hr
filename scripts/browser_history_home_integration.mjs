@@ -1,4 +1,4 @@
-/** Browser smoke for merged AI Jana history and the employee home; synthetic API only. */
+/** Browser smoke for merged AI Jana history and all role homepages; synthetic API only. */
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 
@@ -50,6 +50,7 @@ try {
     });
     await page.goto(origin);
     await page.getByRole("heading", { name: /Сәлем, Айдана!/ }).waitFor();
+    assert.equal(await page.getByRole("heading", { name: /Требуют моего решения/ }).count(), 0);
     await page.getByRole("heading", { name: "Коллеги в отпуске" }).waitFor();
     await page.getByText("Бекжан Демо").waitFor();
     assert.ok(calls.some((path) => path.startsWith("/api/calendar?month=")));
@@ -110,19 +111,40 @@ try {
     assert.deepEqual(errors, []);
     await context.close();
   }
-  for (const role of ["hr_admin", "manager"]) {
-    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  for (const role of ["hr_admin", "manager"]) for (const width of [1440, 390]) {
+    const context = await browser.newContext({ viewport: { width, height: 900 } });
     await context.addInitScript(() => sessionStorage.setItem("jana-hr.access-token", "synthetic-reviewer-token"));
     const page = await context.newPage();
+    const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
+    const review = { ...leave, id: 502, employee_id: 102, employee_name: "Бекжан Демо", can_review: true, status: role === "manager" ? "submitted" : "manager_approved" };
     await page.route("**/api/**", route => {
-      const path = new URL(route.request().url()).pathname;
-      const json = path === "/api/me" ? me(role) : path === "/api/courses/rewards" ? { xp: 0, level: 1, next_level_xp: 100, badges: [] } : [];
+      const url = new URL(route.request().url());
+      const path = url.pathname;
+      const json = path === "/api/me" ? me(role)
+        : path === "/api/requests" ? [leave, review]
+        : path === "/api/requests/502" ? review
+        : path === "/api/courses" ? [course]
+        : path === "/api/calendar" ? { month: url.searchParams.get("month"), employees: [], absences: [] }
+        : path === "/api/courses/rewards" ? { xp: 0, level: 1, next_level_xp: 100, badges: [] } : [];
       return route.fulfill({ json });
     });
     await page.goto(origin);
-    await page.getByRole("heading", { name: /Возможности/ }).waitFor();
-    assert.equal(await page.getByRole("heading", { name: "Коллеги в отпуске" }).count(), 0);
+    await page.getByRole("heading", { name: /Сәлем, Айдана!/ }).waitFor();
+    for (const title of ["Отпускной баланс", "Мой отпуск", "Коллеги в отпуске", "Следующий курс"]) {
+      await page.getByRole("heading", { name: title, exact: true }).waitFor();
+    }
+    const queue = page.getByRole("region", { name: /Требуют моего решения/ });
+    await queue.getByRole("heading", { name: "Требуют моего решения 1" }).waitFor();
+    assert.equal(await queue.getByRole("button", { name: /№501/ }).count(), 0);
+    await queue.getByRole("button", { name: /Бекжан Демо/ }).click();
+    await page.getByRole("dialog", { name: "Заявка №502", exact: true }).waitFor();
+    await page.getByRole("dialog", { name: "Заявка №502", exact: true }).getByRole("button", { name: "Закрыть", exact: true }).click();
+    await queue.getByRole("button", { name: "Вся очередь" }).click();
+    await page.getByRole("button", { name: "Требуют моего решения · 1", exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    assert.deepEqual(errors, []);
     await context.close();
   }
-  console.log("AI Jana history and employee home desktop/mobile browser checks passed.");
+  console.log("AI Jana history and all role home desktop/mobile browser checks passed.");
 } finally { await browser.close(); }

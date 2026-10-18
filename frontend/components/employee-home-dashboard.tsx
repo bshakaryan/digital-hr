@@ -2,7 +2,7 @@
 
 import { date, dateTime, type Course, type LeaveRequest, type Notification, type Profile, type SharedCalendar } from "@/lib/api";
 import type { Resource } from "./use-resource";
-import { ErrorBox, Icon, Loading } from "./ui";
+import { ErrorBox, Icon, Loading, Status } from "./ui";
 import styles from "./employee-home-dashboard.module.css";
 
 export interface EmployeeHomeDashboardProps {
@@ -59,6 +59,8 @@ export function EmployeeHomeDashboard({
   const unread = notifications.data?.filter((item) => !item.read)
     .sort((left, right) => right.created_at.localeCompare(left.created_at) || right.id - left.id);
   const calendarMonth = calendar.data?.month;
+  const reviews = requests.data?.filter((item) => item.can_review);
+  const isReviewer = me.role !== "employee";
 
   return <div className={styles.dashboard}>
     <header className={styles.intro}>
@@ -68,7 +70,7 @@ export function EmployeeHomeDashboard({
 
     <nav className={styles.actions} aria-label="Быстрые действия">
       <button type="button" className={styles.primaryAction} onClick={onRequestLeave}><span className={styles.actionIcon}><Icon name="plus" size={22} /></span><span>Запросить отпуск<small>Создать заявку</small></span><Icon name="arrow" size={18} /></button>
-      <button type="button" className={styles.action} onClick={onMyRequests}><span className={styles.actionIcon}><Icon name="document" size={22} /></span><span>Мои заявки<small>Статусы и история</small></span><Icon name="arrow" size={18} /></button>
+      <button type="button" className={styles.action} onClick={onMyRequests}><span className={styles.actionIcon}><Icon name="document" size={22} /></span><span>{isReviewer ? "Заявки" : "Мои заявки"}<small>{isReviewer ? "Личные и на согласование" : "Статусы и история"}</small></span><Icon name="arrow" size={18} /></button>
       <button type="button" className={styles.action} onClick={onMyCalendar}><span className={styles.actionIcon}><Icon name="calendar" size={22} /></span><span>Мой календарь<small>Отпускные дни</small></span><Icon name="arrow" size={18} /></button>
       <button type="button" className={styles.action} onClick={onMyLearning}><span className={styles.actionIcon}><Icon name="book" size={22} /></span><span>Моё обучение<small>Jana Academy</small></span><Icon name="arrow" size={18} /></button>
     </nav>
@@ -79,6 +81,14 @@ export function EmployeeHomeDashboard({
           <div><span className={styles.kicker}>ЛИЧНОЕ</span><h2 id="home-balance-title">Отпускной баланс</h2><p>Текущий остаток из {me.data_source === "zup" ? "1С:ЗУП" : "демонстрационного 1С:ЗУП"}</p></div>
           <strong>{me.leave_balance}<span>дн.</span></strong>
         </section>
+
+        {isReviewer && <section className={styles.card} aria-labelledby="home-review-title">
+          <div className={styles.cardHeader}><div><span className={styles.kicker}>{me.role === "hr_admin" ? "HR · СОГЛАСОВАНИЕ" : "КОМАНДА · СОГЛАСОВАНИЕ"}</span><h2 id="home-review-title">Требуют моего решения {reviews && !requests.error ? <span className={styles.count}>{reviews.length}</span> : null}</h2></div><button type="button" className={styles.link} onClick={onMyRequests}>Вся очередь <Icon name="arrow" size={16} /></button></div>
+          <p className={styles.context}>Заявки, доступные вам для решения на текущем этапе.</p>
+          {requests.error ? <ErrorBox message={requests.error} retry={requests.reload} /> : requests.loading && !requests.data ? <Loading label="Загружаем очередь решений…" /> : reviews?.length ? <div className={styles.list}>
+            {reviews.slice(0, 3).map((item) => <button type="button" className={`${styles.listButton} ${styles.reviewButton}`} key={item.id} onClick={() => onOpenRequest(item.id)}><span className={styles.listIcon}><Icon name="document" size={19} /></span><span className={styles.listText}><strong>{item.employee_name}</strong><small>{period(item.start_date, item.end_date)} · №{item.id}</small><small>{item.days_count} дн. {item.status === "cancellation_requested" ? "к возврату" : "к списанию"}</small></span><Status value={item.status} /><Icon name="chevron" size={17} /></button>)}
+          </div> : <p className={styles.empty}>Сейчас нет заявок, требующих вашего решения.</p>}
+        </section>}
 
         <section className={styles.card} aria-labelledby="home-leave-title">
           <div className={styles.cardHeader}><div><span className={styles.kicker}>ПЛАНЫ</span><h2 id="home-leave-title">Мой отпуск</h2></div><button type="button" className={styles.link} onClick={onMyCalendar}>Календарь <Icon name="arrow" size={16} /></button></div>
