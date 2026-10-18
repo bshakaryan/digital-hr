@@ -113,3 +113,5 @@ docker compose -f compose.render.yaml down
 Основание: [бесплатные лимиты Render](https://render.com/docs/free), [Render Blueprints](https://render.com/docs/infrastructure-as-code), [поля Blueprint](https://render.com/docs/blueprint-spec), [Docker](https://render.com/docs/docker), [постоянные диски](https://render.com/docs/disks), [стоимость ресурсов](https://render.com/pricing).
 
 Текущее демо (18 октября): после Academy launcher выполняет `app.provision_demo_workspace` до старта API/worker: 25 доступных дней каждому из 34 синтетических сотрудников после наполнения календаря без Айданы и помеченная учебная активность за 14 дней. Чекпоинты/allowance в PostgreSQL защищают новые ручные заявки от повторного сброса. При потере mock-файла восстанавливаются подтверждённые квитанции ЗУП; Documentolog остаётся временным. Подробности — docs/README.md.
+
+После подготовки календаря launcher также выполняет `app.provision_people_learning`: до 153 назначений для 30 Jana People и смоделированная учебная история. Существующие назначения и ручные результаты сохраняются; HR-аналитика охватывает все 34 синтетических профиля. Схема не меняется, повтор безопасен.

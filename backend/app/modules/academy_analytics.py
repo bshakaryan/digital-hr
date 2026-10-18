@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.models import AuditEvent, Course, CourseAssignment, Employee
+from app.modules.integrations import DemoZupFixtures
 
 
 def activity_actions() -> tuple[str, ...]:
@@ -72,7 +73,7 @@ def employee_profile(employee: Employee, rows: list[dict]) -> dict:
 
 
 def overview(db: Session, as_of: date) -> dict:
-    employees = db.scalars(select(Employee).where(Employee.zup_id.like("demo-%")).order_by(Employee.full_name)).all()
+    employees = db.scalars(select(Employee).where(Employee.zup_id.in_([p.zup_id for p in DemoZupFixtures().employees()])).order_by(Employee.full_name)).all()
     rows = rows_for(db, employees, as_of)
     counts = Counter(row["status"] for row in rows)
     course_totals: dict[int, dict] = {}
