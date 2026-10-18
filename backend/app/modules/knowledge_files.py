@@ -52,9 +52,20 @@ def list_knowledge_files(user: Employee = Depends(require_hr), db: Session = Dep
 
 def readable_file(db: Session, file_id: int, user: Employee) -> KnowledgeFile:
     item = db.get(KnowledgeFile, file_id)
-    if item is None or item.access_scope not in ("all", user.role):
+    if item is None or item.access_scope not in readable_scopes(user):
         raise HTTPException(404, "Источник не найден")
     return item
+
+
+def readable_scopes(user: Employee) -> tuple[str, str]:
+    return ("all", user.role)
+
+
+def authorized_file_metadata(db: Session, user: Employee):
+    # Select only display metadata; original bytes and filenames stay out of this path.
+    return db.execute(select(KnowledgeFile.title, KnowledgeFile.media_type).where(
+        KnowledgeFile.access_scope.in_(readable_scopes(user)),
+    ).order_by(KnowledgeFile.id)).all()
 
 
 @router.get("/{file_id}", response_model=KnowledgeFileOut)

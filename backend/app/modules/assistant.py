@@ -8,11 +8,45 @@ from app.database import get_db
 from app.config import get_settings
 from app.models import Employee, KnowledgeDocument
 from app.modules.assistant_llm import generate_answer
+from app.modules.knowledge_files import authorized_file_metadata
 from app.modules.retrieval import ACTION_EQUIVALENTS, concepts, evidence, ranked, supports, terms
 from app.schemas import AssistantOut, Question, Source
 from app.security import current_user
 
 router = APIRouter(tags=["assistant"])
+
+UNSUPPORTED = re.compile(r"игнориру|забудь|инструкци[ию].*систем|system prompt|ignore|зарплат|иин|паспорт|увол|закон|коллег|чуж|персональн.*данн|сколько|\bположен(?:о|а|ы)?\b|начисл|остат|рассчит|пересчит|компенсац|больнич|аванс|срок|длит|стоим|цен[аыу]|жалақ|жеке дерек|әріптес|заң|жсн|қанша")
+INVENTORY_CONTEXT = re.compile(r"баз\w*\s+знан\w*|каталог\w*|корпус\w*|knowledge\s*base")
+INVENTORY_ITEM = re.compile(r"документ\w*|файл\w*|материал\w*|источник\w*|\bpdf\b|\bdocx\b")
+INVENTORY_REQUEST = re.compile(r"\b(?:какие|какой|список|перечень|перечисл\w*|покаж\w*|назов\w*|доступн\w*|загружен\w*|есть)\b")
+CONTENT_REQUEST = re.compile(r"\b(?:написан\w*|сказан\w*|говорит\w*|объясн\w*|нужн\w*|треб\w*|оформ\w*|содерж\w*|курс\w*|как|почему)\b")
+
+
+def inventory_intent(question: str) -> bool:
+    normalized = question.casefold().replace("ё", "е")
+    if not INVENTORY_REQUEST.search(normalized) or CONTENT_REQUEST.search(normalized):
+        return False
+    if INVENTORY_CONTEXT.search(normalized):
+        return bool(INVENTORY_ITEM.search(normalized) or re.search(
+            r"\bчто\b.*\b(?:есть|загружен\w*|доступн\w*)\b", normalized))
+    return bool(INVENTORY_ITEM.search(normalized) and re.search(
+        r"\b(?:список|перечень|перечисл\w*|покаж\w*|какие)\b", normalized))
+
+
+def inventory_answer(db: Session, user: Employee) -> AssistantOut:
+    files = authorized_file_metadata(db, user)
+    if not files:
+        answer = "В базе знаний нет доступных вам документов."
+    else:
+        formats = {"application/pdf": "PDF",
+                   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "DOCX"}
+        answer = "Доступные документы в базе знаний:\n" + "\n".join(
+            f"• {title} ({formats[media_type]})" for title, media_type in files)
+    return AssistantOut(answer=answer, sources=[], escalate_to_hr=False)
+
+
+def refusal_answer() -> AssistantOut:
+    return AssistantOut(answer="В демонстрационной базе нет надёжного ответа на этот вопрос. Обратитесь в HR. Я не получаю персональные данные сотрудников и не принимаю кадровые решения.", sources=[], escalate_to_hr=True)
 
 
 def allowed_documents(db: Session, user: Employee):
@@ -54,13 +88,17 @@ def knowledge(document_id: int, user: Employee = Depends(current_user), db: Sess
 
 @router.post("/assistant/query", response_model=AssistantOut, response_model_exclude_none=True)
 def query(data: Question, user: Employee = Depends(current_user), db: Session = Depends(get_db)):
+    if inventory_intent(data.question):
+        if UNSUPPORTED.search(data.question.lower().replace("ё", "е")):
+            return refusal_answer()
+        return inventory_answer(db, user)
     return answer_from_documents(data.question, allowed_documents(db, user))
 
 
 def answer_from_documents(question: str, documents, *, source_type="knowledge", min_score=0.8) -> AssistantOut:
     normalized = question.lower().replace("ё", "е")
-    refusal = AssistantOut(answer="В демонстрационной базе нет надёжного ответа на этот вопрос. Обратитесь в HR. Я не получаю персональные данные сотрудников и не принимаю кадровые решения.", sources=[], escalate_to_hr=True)
-    if re.search(r"игнориру|забудь|инструкци[ию].*систем|system prompt|ignore|зарплат|иин|паспорт|увол|закон|коллег|чуж|персональн.*данн|сколько|\bположен(?:о|а|ы)?\b|начисл|остат|рассчит|пересчит|компенсац|больнич|аванс|срок|длит|стоим|цен[аыу]|жалақ|жеке дерек|әріптес|заң|жсн|қанша", normalized):
+    refusal = refusal_answer()
+    if UNSUPPORTED.search(normalized):
         return refusal
     matches = ranked(question, documents, min_score=min_score)
     if not matches:
