@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ApiClient, errorMessage, type AssistantAnswer, type Knowledge } from "@/lib/api";
 import { Icon, Loading, Modal } from "./ui";
 import { useResource } from "./use-resource";
-import type { ChatHistoryAdapter, ChatScope } from "./assistant-history-adapter";
+import { createAssistantHistoryAdapter, type ChatHistoryAdapter, type ChatScope } from "./assistant-history-adapter";
 import { AssistantHistorySidebar } from "./assistant-history-sidebar";
 import { exchangesFromMessages, useAssistantHistory } from "./use-assistant-history";
 import styles from "./assistant-ux.module.css";
@@ -12,10 +12,10 @@ import styles from "./assistant-ux.module.css";
 const suggestions = ["Как подать заявку на отпуск?", "Как устроено обучение?", "Какие документы есть в базе знаний?"];
 const leaveQuestion = /(отпуск|демалыс|leave)/i;
 
-interface Exchange { id?: string; question: string; result: AssistantAnswer; sourcesUnavailable?: boolean }
+interface Exchange { id?: string; question: string; result: AssistantAnswer }
 const generalScope: ChatScope = { kind: "general" };
 
-export function Assistant({ api, onCreateLeave, historyAdapter }: { api: ApiClient; onCreateLeave?: () => void; historyAdapter?: ChatHistoryAdapter }) {
+export function Assistant({ api, onCreateLeave, historyAdapter }: { api: ApiClient; onCreateLeave?: () => void; historyAdapter?: ChatHistoryAdapter | null }) {
   const [question, setQuestion] = useState("");
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [pending, setPending] = useState(false);
@@ -25,7 +25,8 @@ export function Assistant({ api, onCreateLeave, historyAdapter }: { api: ApiClie
   const transcript = useRef<HTMLDivElement>(null);
   const followConversation = useRef(true);
   const olderAnchor = useRef<number | null>(null);
-  const history = useAssistantHistory(historyAdapter, generalScope);
+  const defaultHistoryAdapter = useMemo(() => createAssistantHistoryAdapter(api), [api]);
+  const history = useAssistantHistory(historyAdapter === undefined ? defaultHistoryAdapter : historyAdapter ?? undefined, generalScope);
   const visibleExchanges: Exchange[] = history.enabled ? exchangesFromMessages(history.messages) : exchanges;
 
   useEffect(() => {
@@ -73,6 +74,7 @@ export function Assistant({ api, onCreateLeave, historyAdapter }: { api: ApiClie
     try {
       if (history.enabled) {
         if (await history.send(trimmed)) setQuestion("");
+        else setQuestion(trimmed);
       } else {
         const result = await api.post<AssistantAnswer>("/assistant/query", { question: trimmed });
         setExchanges((old) => [...old, { question: trimmed, result }]);
@@ -103,11 +105,11 @@ export function Assistant({ api, onCreateLeave, historyAdapter }: { api: ApiClie
         <span className={styles.headerBadge}>Демо</span>
       </header>
       <div className={styles.chatBody}>
-      {history.enabled && <AssistantHistorySidebar conversations={history.conversations} selectedId={history.selectedId} loading={history.listLoading} loadingMore={history.listMoreLoading} error={history.listError} nextCursor={history.nextCursor} busy={pending} onNew={() => { history.newConversation(); setQuestion(""); followConversation.current = true; }} onSelect={(id) => { void history.openConversation(id); setQuestion(""); setSourceId(null); followConversation.current = true; }} onRetry={() => void history.refreshList()} onMore={() => void history.loadMoreConversations()} />}
+      {history.enabled && <AssistantHistorySidebar conversations={history.conversations} selectedId={history.selectedId} loading={history.listLoading} loadingMore={history.listMoreLoading} error={history.listError} nextPage={history.nextPage} busy={pending} onNew={() => { history.newConversation(); setQuestion(""); followConversation.current = true; }} onSelect={(id) => { void history.openConversation(id); setQuestion(""); setSourceId(null); followConversation.current = true; }} onRetry={() => void history.refreshList()} onMore={() => void history.loadMoreConversations()} />}
       <div className={styles.chatMain}>
       <div className={styles.transcript} ref={transcript} onScroll={trackReadingPosition} aria-label="Сообщения">
         <div className={styles.thread}>
-          {history.enabled && history.nextBeforeId && <button type="button" className={styles.olderMessages} onClick={() => void showOlder()} disabled={history.olderLoading}>{history.olderLoading ? "Загружаем…" : "Показать предыдущие сообщения"}</button>}
+          {history.enabled && history.previousPage && <button type="button" className={styles.olderMessages} onClick={() => void showOlder()} disabled={history.olderLoading}>{history.olderLoading ? "Загружаем…" : "Показать предыдущие сообщения"}</button>}
           {history.enabled && history.olderError && <div className={styles.error} role="alert">Не удалось загрузить предыдущие сообщения: {history.olderError} <button type="button" onClick={() => void showOlder()}>Повторить</button></div>}
           {history.enabled && history.messagesLoading && <p className={styles.threadState} role="status">Открываем диалог…</p>}
           {history.enabled && history.messagesError && <div className={styles.error} role="alert">Не удалось открыть историю: {history.messagesError} <button type="button" onClick={() => history.selectedId && void history.openConversation(history.selectedId)}>Повторить</button></div>}
@@ -129,7 +131,6 @@ export function Assistant({ api, onCreateLeave, historyAdapter }: { api: ApiClie
                 <div className={`${styles.assistantBubble} ${exchange.result.escalate_to_hr ? styles.refusalBubble : ""}`}>{exchange.result.answer}</div>
                 {exchange.result.sources.length > 0 && <div className={styles.sourceList} aria-label="Источники ответа">{exchange.result.sources.map((source, sourceIndex) => <details className={styles.source} key={`${source.document_id}-${sourceIndex}`} onToggle={(event) => revealSource(event.currentTarget)}><summary><span className={styles.sourceNumber}>[{sourceIndex + 1}]</span><span className={styles.sourceTitle}>{source.source_filename || source.title}</span><Icon name="chevron" size={13} /></summary><div className={styles.sourceDetail}><strong>{source.title}</strong><span>{source.section}{source.page_number ? ` · стр. ${source.page_number}` : ""}{source.version ? ` · версия ${source.version}` : ""}</span><p>{source.content}</p>{source.classification === "synthetic_demo" && <small>Демонстрационный материал, не кадровое правило компании.</small>}<button type="button" onClick={() => setSourceId(source.document_id)}>Открыть полный источник <Icon name="arrow" size={13} /></button></div></details>)}</div>}
                 {exchange.result.sources.some((source) => source.classification === "external_legal_snapshot") && <p className={styles.safetyNote}>Копия закона: актуальность нормы не проверена.</p>}
-                {exchange.sourcesUnavailable && <p className={styles.safetyNote}>Часть прежних источников больше недоступна. Проверьте актуальный доступ.</p>}
                 {exchange.result.escalate_to_hr && <p className={styles.refusalNote}><Icon name="people" size={15} /> Обратитесь к HR лично. Помощник не отправляет обращения автоматически.</p>}
                 {leaveQuestion.test(exchange.question) && <div className={styles.contextAction}><span>Хотите перейти к заявке?</span>{leaveAction()}</div>}
               </div>

@@ -2,17 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorMessage, type AssistantAnswer } from "@/lib/api";
-import { sameScope, type ChatHistoryAdapter, type ChatScope, type ConversationSummary, type StoredChatMessage } from "./assistant-history-adapter";
+import { HistoryUnavailableError, sameScope, type ChatHistoryAdapter, type ChatScope, type ConversationSummary, type StoredChatMessage } from "./assistant-history-adapter";
 
 export interface HistoryExchange {
   id: string;
   question: string;
   result: AssistantAnswer;
-  sourcesUnavailable?: boolean;
 }
 
 export function exchangesFromMessages(messages: StoredChatMessage[]): HistoryExchange[] {
-  const questions = new Map<string, string>();
+  const questions = new Map<number, string>();
   const exchanges: HistoryExchange[] = [];
   for (const message of messages) {
     if (message.role === "user") questions.set(message.turn_id, message.content);
@@ -20,14 +19,13 @@ export function exchangesFromMessages(messages: StoredChatMessage[]): HistoryExc
       const question = questions.get(message.turn_id);
       if (question === undefined) continue;
       exchanges.push({
-        id: message.turn_id, question,
+        id: String(message.turn_id), question,
         result: {
           answer: message.content,
           sources: message.sources || [],
           escalate_to_hr: message.escalate_to_hr ?? false,
           mode: message.mode ?? "extractive_demo",
         },
-        sourcesUnavailable: message.sources_unavailable,
       });
       questions.delete(message.turn_id);
     }
@@ -40,15 +38,17 @@ export function useAssistantHistory(adapter: ChatHistoryAdapter | undefined, sco
   const generation = useRef(0);
   const selectionGeneration = useRef(0);
   const sending = useRef(false);
-  const retryTurn = useRef<{ question: string; conversationId: string | null; id: string } | null>(null);
+  const retryTurn = useRef<{ question: string; conversationId: number | null; id: string } | null>(null);
+  const [activeScopeKey, setActiveScopeKey] = useState(scopeKey);
+  const [unavailable, setUnavailable] = useState(false);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [nextPage, setNextPage] = useState<number | null>(null);
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState("");
   const [listMoreLoading, setListMoreLoading] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [messages, setMessages] = useState<StoredChatMessage[]>([]);
-  const [nextBeforeId, setNextBeforeId] = useState<string | null>(null);
+  const [previousPage, setPreviousPage] = useState<number | null>(null);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [messagesError, setMessagesError] = useState("");
   const [olderLoading, setOlderLoading] = useState(false);
@@ -65,9 +65,12 @@ export function useAssistantHistory(adapter: ChatHistoryAdapter | undefined, sco
       const page = await adapter.list(scope);
       if (generation.current !== current) return;
       setConversations(page.items.filter((item) => sameScope(scope, item)));
-      setNextCursor(page.next_cursor);
+      setNextPage(page.nextPage);
     } catch (cause) {
-      if (generation.current === current) setListError(errorMessage(cause));
+      if (generation.current === current) {
+        if (cause instanceof HistoryUnavailableError) setUnavailable(true);
+        else setListError(errorMessage(cause));
+      }
     } finally {
       if (generation.current === current) setListLoading(false);
     }
@@ -77,11 +80,13 @@ export function useAssistantHistory(adapter: ChatHistoryAdapter | undefined, sco
     generation.current += 1;
     selectionGeneration.current += 1;
     retryTurn.current = null;
+    setActiveScopeKey(scopeKey);
+    setUnavailable(false);
     setConversations([]);
-    setNextCursor(null);
+    setNextPage(null);
     setSelectedId(null);
     setMessages([]);
-    setNextBeforeId(null);
+    setPreviousPage(null);
     setMessagesError("");
     setOlderError("");
     setSendError("");
@@ -97,33 +102,36 @@ export function useAssistantHistory(adapter: ChatHistoryAdapter | undefined, sco
   }, [adapter, scopeKey, refreshList]);
 
   async function loadMoreConversations() {
-    if (!adapter || !nextCursor || listMoreLoading) return;
+    if (!adapter || unavailable || activeScopeKey !== scopeKey || !nextPage || listMoreLoading) return;
     const current = generation.current;
     setListMoreLoading(true);
     setListError("");
     try {
-      const page = await adapter.list(scope, nextCursor);
+      const page = await adapter.list(scope, nextPage);
       if (generation.current !== current) return;
       setConversations((old) => {
         const ids = new Set(old.map((item) => item.id));
         return [...old, ...page.items.filter((item) => sameScope(scope, item) && !ids.has(item.id))];
       });
-      setNextCursor(page.next_cursor);
+      setNextPage(page.nextPage);
     } catch (cause) {
-      if (generation.current === current) setListError(errorMessage(cause));
+      if (generation.current === current) {
+        if (cause instanceof HistoryUnavailableError) setUnavailable(true);
+        else setListError(errorMessage(cause));
+      }
     } finally {
       if (generation.current === current) setListMoreLoading(false);
     }
   }
 
-  async function openConversation(id: string) {
-    if (!adapter || sending.current) return;
+  async function openConversation(id: number) {
+    if (!adapter || unavailable || activeScopeKey !== scopeKey || sending.current) return;
     const current = generation.current;
     const selection = ++selectionGeneration.current;
     retryTurn.current = null;
     setSelectedId(id);
     setMessages([]);
-    setNextBeforeId(null);
+    setPreviousPage(null);
     setSendError("");
     setMessagesError("");
     setOlderError("");
@@ -133,7 +141,7 @@ export function useAssistantHistory(adapter: ChatHistoryAdapter | undefined, sco
       if (generation.current !== current || selectionGeneration.current !== selection) return;
       if (page.id !== id || !sameScope(scope, page)) throw new Error("Диалог не относится к этому разделу.");
       setMessages(page.messages);
-      setNextBeforeId(page.next_before_id);
+      setPreviousPage(page.previousPage);
     } catch (cause) {
       if (generation.current === current && selectionGeneration.current === selection) setMessagesError(errorMessage(cause));
     } finally {
@@ -147,7 +155,7 @@ export function useAssistantHistory(adapter: ChatHistoryAdapter | undefined, sco
     retryTurn.current = null;
     setSelectedId(null);
     setMessages([]);
-    setNextBeforeId(null);
+    setPreviousPage(null);
     setMessagesError("");
     setOlderError("");
     setSendError("");
@@ -155,21 +163,21 @@ export function useAssistantHistory(adapter: ChatHistoryAdapter | undefined, sco
   }
 
   async function loadOlderMessages(): Promise<boolean> {
-    if (!adapter || !selectedId || !nextBeforeId || olderLoading || messagesLoading) return false;
+    if (!adapter || unavailable || activeScopeKey !== scopeKey || !selectedId || !previousPage || olderLoading || messagesLoading) return false;
     const current = generation.current;
     const selection = selectionGeneration.current;
     const id = selectedId;
     setOlderLoading(true);
     setOlderError("");
     try {
-      const page = await adapter.open(scope, id, nextBeforeId);
+      const page = await adapter.open(scope, id, previousPage);
       if (generation.current !== current || selectionGeneration.current !== selection) return false;
       if (page.id !== id || !sameScope(scope, page)) throw new Error("Диалог не относится к этому разделу.");
       setMessages((old) => {
         const ids = new Set(old.map((message) => message.id));
         return [...page.messages.filter((message) => !ids.has(message.id)), ...old];
       });
-      setNextBeforeId(page.next_before_id);
+      setPreviousPage(page.previousPage);
       return true;
     } catch (cause) {
       if (generation.current === current && selectionGeneration.current === selection) setOlderError(errorMessage(cause));
@@ -180,7 +188,7 @@ export function useAssistantHistory(adapter: ChatHistoryAdapter | undefined, sco
   }
 
   async function send(question: string): Promise<boolean> {
-    if (!adapter || sending.current || messagesLoading || question.trim().length < 3) return false;
+    if (!adapter || unavailable || activeScopeKey !== scopeKey || sending.current || messagesLoading || question.trim().length < 3) return false;
     const trimmed = question.trim();
     const current = generation.current;
     const selection = selectionGeneration.current;
@@ -195,12 +203,14 @@ export function useAssistantHistory(adapter: ChatHistoryAdapter | undefined, sco
     try {
       const answer = await adapter.send(scope, trimmed, clientTurnId, conversationId || undefined);
       if (generation.current !== current || selectionGeneration.current !== selection) return false;
-      if (!answer.conversation_id || !answer.turn_id) throw new Error("Сервер не подтвердил сохранение диалога.");
+      if (!answer.conversation_id || !answer.turn_id || answer.client_turn_id !== clientTurnId)
+        throw new Error("Сервер не подтвердил сохранение диалога.");
       retryTurn.current = null;
       setSelectedId(answer.conversation_id);
       const createdAt = new Date().toISOString();
       setMessages((old) => [...old,
-        { id: `${answer.turn_id}:user`, turn_id: answer.turn_id, role: "user", content: trimmed, created_at: createdAt },
+        { id: `${answer.turn_id}:user`, turn_id: answer.turn_id, role: "user", content: trimmed,
+          sources: [], escalate_to_hr: null, mode: null, created_at: createdAt },
         { id: `${answer.turn_id}:assistant`, turn_id: answer.turn_id, role: "assistant", content: answer.answer,
           sources: answer.sources, escalate_to_hr: answer.escalate_to_hr, mode: answer.mode, created_at: createdAt },
       ]);
@@ -217,9 +227,13 @@ export function useAssistantHistory(adapter: ChatHistoryAdapter | undefined, sco
     }
   }
 
+  const scopeReady = activeScopeKey === scopeKey;
   return {
-    enabled: Boolean(adapter), conversations, nextCursor, listLoading, listMoreLoading, listError,
-    selectedId, messages, nextBeforeId, messagesLoading, messagesError, olderLoading, olderError,
+    enabled: Boolean(adapter) && !unavailable,
+    conversations: scopeReady ? conversations : [], nextPage: scopeReady ? nextPage : null,
+    listLoading, listMoreLoading, listError,
+    selectedId: scopeReady ? selectedId : null, messages: scopeReady ? messages : [],
+    previousPage: scopeReady ? previousPage : null, messagesLoading, messagesError, olderLoading, olderError,
     sendLoading, sendError, refreshList, loadMoreConversations, openConversation,
     newConversation, loadOlderMessages, send,
   };

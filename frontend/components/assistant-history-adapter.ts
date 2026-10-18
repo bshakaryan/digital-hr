@@ -1,82 +1,108 @@
-import type { ApiClient, AssistantAnswer, Knowledge } from "@/lib/api";
+import { ApiError, type ApiClient, type AssistantAnswer, type AssistantConversation,
+  type AssistantConversationDetail, type AssistantConversationPage, type Knowledge } from "@/lib/api";
 
-// Provisional contract from docs/AI_JANA_CHAT_AUDIT.md. No production component
-// creates this adapter until the Integration Lead approves and implements it.
 export type ChatScope = { kind: "general" } | { kind: "course"; courseId: number };
-
-export interface ConversationSummary {
-  id: string;
-  scope: "general" | "course";
-  course_id: number | null;
-  title: string;
-  updated_at: string;
-}
+export type ConversationSummary = AssistantConversation;
 
 export interface ConversationListPage {
   items: ConversationSummary[];
-  next_cursor: string | null;
+  nextPage: number | null;
 }
 
 export interface StoredChatMessage {
   id: string;
-  turn_id: string;
+  turn_id: number;
   role: "user" | "assistant";
   content: string;
   created_at: string;
-  sources?: Knowledge[];
-  sources_unavailable?: boolean;
-  escalate_to_hr?: boolean;
-  mode?: AssistantAnswer["mode"];
+  sources: Knowledge[];
+  escalate_to_hr: boolean | null;
+  mode: AssistantAnswer["mode"] | null;
 }
 
 export interface ConversationMessagePage {
-  id: string;
-  scope: "general" | "course";
+  id: number;
   course_id: number | null;
-  messages: StoredChatMessage[]; // oldest to newest; pages contain complete turns
-  next_before_id: string | null;
+  messages: StoredChatMessage[];
+  previousPage: number | null;
 }
 
 export interface SentChatAnswer extends AssistantAnswer {
-  conversation_id: string;
-  turn_id: string;
+  conversation_id: number;
+  turn_id: number;
+  client_turn_id: string;
 }
 
 export interface ChatHistoryAdapter {
-  list(scope: ChatScope, cursor?: string): Promise<ConversationListPage>;
-  open(scope: ChatScope, id: string, beforeId?: string): Promise<ConversationMessagePage>;
-  send(scope: ChatScope, question: string, clientTurnId: string, conversationId?: string): Promise<SentChatAnswer>;
+  list(scope: ChatScope, page?: number): Promise<ConversationListPage>;
+  open(scope: ChatScope, id: number, page?: number): Promise<ConversationMessagePage>;
+  send(scope: ChatScope, question: string, clientTurnId: string, conversationId?: number): Promise<SentChatAnswer>;
 }
 
-function scopeQuery(scope: ChatScope): string {
-  const query = new URLSearchParams({ scope: scope.kind });
-  if (scope.kind === "course") query.set("course_id", String(scope.courseId));
-  return query.toString();
+export class HistoryUnavailableError extends Error {
+  constructor() { super("История диалогов недоступна."); this.name = "HistoryUnavailableError"; }
 }
 
-/** Construct only after the server contract is approved; never used by default. */
-export function createProvisionalChatHistoryAdapter(api: ApiClient): ChatHistoryAdapter {
+export function sameScope(scope: ChatScope, item: { course_id: number | null }): boolean {
+  return scope.kind === "general" ? item.course_id === null : item.course_id === scope.courseId;
+}
+
+const listPageSize = 20;
+const messagePageSize = 30;
+
+function messagesFromDetail(detail: AssistantConversationDetail): ConversationMessagePage {
   return {
-    list(scope, cursor) {
-      const query = new URLSearchParams(scopeQuery(scope));
-      if (cursor) query.set("cursor", cursor);
-      return api.call<ConversationListPage>(`/assistant/conversations?${query}`);
+    id: detail.id,
+    course_id: detail.course_id,
+    previousPage: detail.page > 1 ? detail.page - 1 : null,
+    messages: detail.messages.map((message) => ({
+      id: `${message.id}:${message.role}`,
+      turn_id: message.id,
+      role: message.role,
+      content: message.text,
+      created_at: message.created_at,
+      sources: message.sources || [],
+      escalate_to_hr: message.escalate_to_hr,
+      mode: message.mode,
+    })),
+  };
+}
+
+/** Uses the implemented PostgreSQL history API. List 404/405 means an older server: use stateless chat. */
+export function createAssistantHistoryAdapter(api: ApiClient): ChatHistoryAdapter {
+  const detail = (id: number, page: number) => api.call<AssistantConversationDetail>(
+    `/assistant/conversations/${id}?page=${page}&page_size=${messagePageSize}`);
+  return {
+    async list(scope, page = 1) {
+      let result: AssistantConversationPage;
+      try {
+        result = await api.call<AssistantConversationPage>(
+          `/assistant/conversations?page=${page}&page_size=${listPageSize}`);
+      } catch (cause) {
+        if (cause instanceof ApiError && (cause.status === 404 || cause.status === 405)) throw new HistoryUnavailableError();
+        throw cause;
+      }
+      return {
+        items: result.items.filter((item) => sameScope(scope, item)),
+        nextPage: result.page * result.page_size < result.total ? result.page + 1 : null,
+      };
     },
-    open(scope, id, beforeId) {
-      const query = new URLSearchParams(scopeQuery(scope));
-      if (beforeId) query.set("before_id", beforeId);
-      return api.call<ConversationMessagePage>(`/assistant/conversations/${encodeURIComponent(id)}?${query}`);
+    async open(scope, id, page) {
+      // The server pages turns from oldest to newest. Open the last page for a normal chat view.
+      const first = page === undefined ? await detail(id, 1) : null;
+      if (first && !sameScope(scope, first)) throw new Error("Диалог не относится к этому разделу.");
+      const lastPage = first ? Math.max(1, Math.ceil(first.total_turns / first.page_size)) : page!;
+      const result = first && lastPage === 1 ? first : await detail(id, lastPage);
+      if (!sameScope(scope, result) || result.id !== id) throw new Error("Диалог не относится к этому разделу.");
+      return messagesFromDetail(result);
     },
     send(scope, question, clientTurnId, conversationId) {
       const path = scope.kind === "course" ? `/courses/${scope.courseId}/ask` : "/assistant/query";
       return api.post<SentChatAnswer>(path, {
-        question, client_turn_id: clientTurnId,
+        question,
+        client_turn_id: clientTurnId,
         ...(conversationId ? { conversation_id: conversationId } : {}),
       });
     },
   };
-}
-
-export function sameScope(scope: ChatScope, item: { scope: "general" | "course"; course_id: number | null }): boolean {
-  return item.scope === scope.kind && (scope.kind === "general" ? item.course_id === null : item.course_id === scope.courseId);
 }
