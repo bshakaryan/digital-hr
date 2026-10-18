@@ -26,6 +26,7 @@ class DemoLeave:
     month_offset: int
     day: int
     code: str | None = None
+    duration: int = 3
 
 
 # Seven final approvals make every department visible in the current calendar.
@@ -75,7 +76,7 @@ def next_month(first: date) -> date:
     return (first.replace(day=28) + timedelta(days=4)).replace(day=1)
 
 
-def provision(db: Session, *, as_of: date | None = None) -> dict:
+def provision(db: Session, *, as_of: date | None = None, plan=None, exclude_zup_ids=()) -> dict:
     if get_settings().zup_mode != "mock":
         raise RuntimeError("Synthetic leave provisioning requires ZUP_MODE=mock")
     today = as_of or datetime.now(ZoneInfo("Asia/Qyzylorda")).date()
@@ -83,7 +84,8 @@ def provision(db: Session, *, as_of: date | None = None) -> dict:
     if any(month.year not in SUPPORTED_YEARS for month in months):
         raise RuntimeError("Current and following month must be supported by the mock ZUP calendar")
 
-    ids = {spec.zup_id for spec in ALL_PLAN}
+    plan = tuple(spec for spec in (ALL_PLAN if plan is None else plan) if spec.zup_id not in exclude_zup_ids)
+    ids = {spec.zup_id for spec in plan}
     people = {person.zup_id: person for person in db.scalars(select(Employee).where(Employee.zup_id.in_(ids))).all()}
     hr = db.scalar(select(Employee).where(Employee.zup_id == "demo-3", Employee.role == "hr_admin"))
     if len(people) != len(ids) or hr is None:
@@ -93,7 +95,7 @@ def provision(db: Session, *, as_of: date | None = None) -> dict:
     skipped_overlaps = []
     skipped_insufficient_balance = []
     planned_periods = {}
-    for spec in ALL_PLAN:
+    for spec in plan:
         owner = people[spec.zup_id]
         if owner.zup_id != spec.zup_id or owner.role not in ("employee", "manager"):
             raise RuntimeError(f"Synthetic leave author has changed: {spec.zup_id}")
@@ -103,7 +105,7 @@ def provision(db: Session, *, as_of: date | None = None) -> dict:
         if owner.role == "manager" and hr.id == owner.id:
             raise RuntimeError(f"No independent HR reviewer: {spec.zup_id}")
         start = months[spec.month_offset].replace(day=spec.day)
-        end = start + timedelta(days=2)
+        end = start + timedelta(days=spec.duration - 1)
         if end.month != start.month:
             raise RuntimeError(f"Demo leave crosses the calendar month: {spec.zup_id}")
         if any(start <= prior_end and end >= prior_start for prior_start, prior_end in planned_periods.get(owner.id, ())):

@@ -349,6 +349,7 @@ class LearningAnalyticsOut(BaseModel):
     overdue_assignments: int
     status_counts: dict[str, int]
     course_completion: list[dict]
+    activity_includes_demo: bool = False
     daily_activity: list[dict]
     overdue_by_department: list[dict]
     assignments: list[LearningAssignmentOut]

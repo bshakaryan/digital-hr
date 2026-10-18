@@ -114,6 +114,7 @@ export interface LearningAnalytics {
   completion_rate: number; overdue_assignments: number;
   status_counts: Record<LearningStatus, number>;
   course_completion: { course_id: number; course_title: string; total: number; completed: number; rate: number }[];
+  activity_includes_demo: boolean;
   daily_activity: { date: string; count: number }[];
   overdue_by_department: { department: string; count: number }[];
   assignments: LearningAssignment[]; employees: EmployeeLearning[];

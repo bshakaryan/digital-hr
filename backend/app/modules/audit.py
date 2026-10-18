@@ -15,6 +15,10 @@ from app.security import require_hr
 router = APIRouter(prefix="/audit", tags=["audit"], dependencies=[Depends(require_hr)])
 
 ACTION_LABELS = {
+    "demo.request_cleared": "Демо: календарь освобождён оператором",
+    "demo.leave_balance_set": "Демо: установлен остаток 25 дней",
+    "demo.course.progressed": "Демо: смоделировано изучение курса",
+    "demo.course.completed": "Демо: смоделировано завершение курса",
     "auth.login": "Вход в систему", "request.created": "Заявка отправлена",
     "request.manager_approved": "Руководитель согласовал заявку", "request.approved": "HR согласовал заявку", "request.approved_by_manager": "Руководитель согласовал заявку",
     "request.rejected": "Заявка отклонена", "request.withdrawn": "Заявка отозвана",

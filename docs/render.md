@@ -31,7 +31,7 @@ Render запускает Docker-образы, а инфраструктуру �
 
 Можно перейти сразу к [созданию Blueprint из репозитория](https://render.com/deploy?repo=https://github.com/bshakaryan/digital-hr), когда `render.yaml` уже есть в GitHub. Перед запуском всё равно проверьте предлагаемые ресурсы.
 
-При первом старте launcher проверяет настройки и права диска, поднимает mock-сервисы, выполняет `alembic upgrade head`, seed пустой базы, добавляет синтетический каталог Jana People, импортирует 11 исходных файлов и наполняет Academy существующими идемпотентными командами. Только после успешного завершения запускаются API, worker и интерфейс. Большой демонстрационный набор отпусков `app.provision_jana_people_leave` автоматически не запускается.
+При первом старте launcher проверяет настройки и права диска, поднимает mock-сервисы, выполняет `alembic upgrade head`, seed пустой базы, добавляет синтетический каталог Jana People, импортирует 11 исходных файлов и наполняет Academy существующими идемпотентными командами. Только после успешного завершения запускаются API, worker и интерфейс. Текущее демо подготавливается автоматически командой `app.provision_demo_workspace` после Academy; Айдана исключена из календаря, прежние активные периоды освобождаются только при первом запуске.
 
 ### Публикация подготовленных файлов в GitHub
 
@@ -111,3 +111,5 @@ docker compose -f compose.render.yaml down
 Используется отдельный Compose project `digital-hr-render-local` с собственным PostgreSQL volume. Обычный локальный стек из `compose.yaml` продолжает работать отдельно. `down` сохраняет PostgreSQL, но удаляет временные mock-файлы вместе с web-контейнером; `down -v` дополнительно удаляет PostgreSQL этого стенда. Локальная проверка не подтверждает лимиты/сроки аккаунта Render, сеть провайдера или успешный удалённый деплой.
 
 Основание: [бесплатные лимиты Render](https://render.com/docs/free), [Render Blueprints](https://render.com/docs/infrastructure-as-code), [поля Blueprint](https://render.com/docs/blueprint-spec), [Docker](https://render.com/docs/docker), [постоянные диски](https://render.com/docs/disks), [стоимость ресурсов](https://render.com/pricing).
+
+Текущее демо (18 октября): после Academy launcher выполняет `app.provision_demo_workspace` до старта API/worker: 25 доступных дней каждому из 34 синтетических сотрудников после наполнения календаря без Айданы и помеченная учебная активность за 14 дней. Чекпоинты/allowance в PostgreSQL защищают новые ручные заявки от повторного сброса. При потере mock-файла восстанавливаются подтверждённые квитанции ЗУП; Documentolog остаётся временным. Подробности — docs/README.md.

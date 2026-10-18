@@ -9,6 +9,13 @@ from app.config import get_settings
 from app.models import AuditEvent, Course, CourseAssignment, Employee
 
 
+def activity_actions() -> tuple[str, ...]:
+    actions = ("course.progressed", "course.completed")
+    if get_settings().zup_mode == "mock":
+        actions += ("demo.course.progressed", "demo.course.completed")
+    return actions
+
+
 def reference_date() -> date:
     settings = get_settings()
     return settings.academy_demo_as_of if settings.zup_mode == "mock" else date.today()
@@ -28,7 +35,7 @@ def rows_for(db: Session, employees: list[Employee], as_of: date) -> list[dict]:
         .where(CourseAssignment.employee_id.in_(ids), Course.status == "published")
         .order_by(CourseAssignment.employee_id, Course.id)).all()
     events = db.scalars(select(AuditEvent).where(AuditEvent.actor_id.in_(ids), AuditEvent.entity_type == "course",
-        AuditEvent.action.in_(("course.progressed", "course.completed")))).all()
+        AuditEvent.action.in_(activity_actions()))).all()
     activity: dict[tuple[int, int], list[AuditEvent]] = defaultdict(list)
     for event in events:
         activity[(event.actor_id, event.entity_id)].append(event)
@@ -37,7 +44,7 @@ def rows_for(db: Session, employees: list[Employee], as_of: date) -> list[dict]:
         employee = people[assignment.employee_id]
         status, overdue = assignment_status(assignment, as_of)
         history = activity[(employee.id, course.id)]
-        completion = [event.created_at for event in history if event.action == "course.completed"]
+        completion = [event.created_at for event in history if event.action in ("course.completed", "demo.course.completed")]
         rows.append({"employee_id": employee.id, "employee_name": employee.full_name,
             "department": employee.department, "course_id": course.id, "course_title": course.title,
             "category": course.category, "learning_track": assignment.learning_track,
@@ -79,7 +86,7 @@ def overview(db: Session, as_of: date) -> dict:
     overdue_departments = Counter(row["department"] for row in rows if row["overdue"])
     ids = [employee.id for employee in employees]
     events = db.scalars(select(AuditEvent).where(AuditEvent.actor_id.in_(ids),
-        AuditEvent.entity_type == "course", AuditEvent.action.in_(("course.progressed", "course.completed")))).all() if ids else []
+        AuditEvent.entity_type == "course", AuditEvent.action.in_(activity_actions()))).all() if ids else []
     daily = Counter(event.created_at.date() for event in events)
     return {"as_of": as_of, "total_demo_employees": len(employees),
         "published_courses": len(db.scalars(select(Course.id).where(Course.status == "published")).all()),
@@ -87,6 +94,7 @@ def overview(db: Session, as_of: date) -> dict:
         "overdue_assignments": sum(row["overdue"] for row in rows),
         "status_counts": {key: counts[key] for key in ("completed", "in_progress", "not_started")},
         "course_completion": sorted(course_totals.values(), key=lambda bucket: (-bucket["total"], bucket["course_title"])),
+        "activity_includes_demo": any(event.action.startswith("demo.") and as_of - timedelta(days=13) <= event.created_at.date() <= as_of for event in events),
         "daily_activity": [{"date": as_of - timedelta(days=day), "count": daily[as_of - timedelta(days=day)]} for day in range(13, -1, -1)],
         "overdue_by_department": [{"department": name, "count": count} for name, count in sorted(overdue_departments.items())],
         "assignments": rows, "employees": [employee_profile(employee, rows) for employee in employees]}

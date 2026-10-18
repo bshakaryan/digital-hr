@@ -11,12 +11,13 @@ from app.config import get_settings
 engine = create_engine(get_settings().database_url)
 with engine.connect() as connection:
     inspector = inspect(connection)
+    primary_keys = {name: inspector.get_pk_constraint(name)["constrained_columns"] for name in inspector.get_table_names()}
     columns = {name: [column["name"] for column in inspector.get_columns(name)] for name in inspector.get_table_names() if name != "alembic_version"}
 
 
 def snapshot():
     with engine.connect() as connection:
-        return {name: connection.execute(text(f'SELECT {",".join(fields)} FROM {name} ORDER BY id')).all() for name, fields in columns.items()}
+        return {name: connection.execute(text(f'SELECT {",".join(fields)} FROM {name} ORDER BY {",".join(primary_keys[name])}')).all() for name, fields in columns.items()}
 
 
 before = snapshot()

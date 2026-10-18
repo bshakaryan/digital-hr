@@ -267,3 +267,10 @@ class AuditEvent(Base):
     entity_type: Mapped[str] = mapped_column(String(40))
     entity_id: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class DemoSetupState(Base):
+    __tablename__ = "demo_setup_state"
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

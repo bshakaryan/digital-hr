@@ -93,6 +93,8 @@ def main():
                        env=env, check=True, timeout=240)
         subprocess.run([sys.executable, "-m", "app.provision_academy_demo"],
                        env=env, check=True, timeout=240)
+        subprocess.run([sys.executable, "-m", "app.provision_demo_workspace"],
+                       env=env, check=True, timeout=240)
         start("backend", uvicorn("app.main:app", 8000))
         wait_http("http://127.0.0.1:8000/api/health")
         start("ZUP worker", [sys.executable, "-m", "app.zup_worker"])
