@@ -1,5 +1,7 @@
 # JanaМен Digital HR
 
+**[Открыть демосайт](https://digital-hr-6kln.onrender.com)**
+
 Веб-приложение для сотрудников, руководителей и HR. В одном месте можно посмотреть профиль, оформить отпуск, пройти обучение и задать вопрос помощнику AI Jana.
 
 Проект сделан для Challenge 02 Digital HR хакатона Jana Post × Terricon Valley.
