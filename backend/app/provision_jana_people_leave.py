@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.database import get_engine
 from app.models import Employee, LeaveRequest
+from app.modules.leave_balance import quote_leave
 from app.modules.requests import create_request, decide
 from app.schemas import RequestCreate, RequestDecision
 from app.zup_calendar import SUPPORTED_YEARS
@@ -90,6 +91,7 @@ def provision(db: Session, *, as_of: date | None = None) -> dict:
 
     prepared = []
     skipped_overlaps = []
+    skipped_insufficient_balance = []
     planned_periods = {}
     for spec in ALL_PLAN:
         owner = people[spec.zup_id]
@@ -124,6 +126,11 @@ def provision(db: Session, *, as_of: date | None = None) -> dict:
             skipped_overlaps.append({"zup_id": spec.zup_id, "start_date": start.isoformat(),
                 "end_date": end.isoformat(), "existing_request_id": overlap})
             continue
+        quote, available = quote_leave(db, owner, start, end)
+        if quote.days_count > available:
+            skipped_insufficient_balance.append({"zup_id": spec.zup_id, "start_date": start.isoformat(),
+                "end_date": end.isoformat(), "required_days": quote.days_count, "available_days": available})
+            continue
         prepared.append((spec, owner, manager, start, end, key, False))
 
     keys = [row[5] for row in prepared]
@@ -156,7 +163,8 @@ def provision(db: Session, *, as_of: date | None = None) -> dict:
     return {"month": months[0].strftime("%Y-%m"), "created": created,
         "requests": len(rows), "by_status": {status: sum(row.status == status for row in rows)
             for status in ("approved", "submitted", "manager_approved", "rejected")},
-        "departments": len({row.department for row in rows}), "skipped_overlaps": skipped_overlaps}
+        "departments": len({row.department for row in rows}), "skipped_overlaps": skipped_overlaps,
+        "skipped_insufficient_balance": skipped_insufficient_balance}
 
 
 def main() -> None:

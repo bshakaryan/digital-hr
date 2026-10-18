@@ -22,7 +22,7 @@ def test_provisioned_leave_is_valid_and_idempotent(api):
     first = populate(api)
     assert first == {"month": "2026-10", "created": 30, "requests": 30,
         "by_status": {"approved": 17, "submitted": 4, "manager_approved": 5, "rejected": 4},
-        "departments": 8, "skipped_overlaps": []}
+        "departments": 8, "skipped_overlaps": [], "skipped_insufficient_balance": []}
     with api.db.session() as db:
         rows = db.scalars(select(LeaveRequest).where(LeaveRequest.idempotency_key.like("jana-people-leave-v1-%"))).all()
         assert len(rows) == len(ALL_PLAN) == 30
@@ -228,5 +228,40 @@ def test_existing_leave_overlap_skips_period_without_rewriting_it(api):
     assert api.db.adapter.balance("demo-1").balance == original_balance - other_approved.days_count
     with api.db.session() as db:
         second = demo.provision(db, as_of=date(2026, 10, 18))
+    assert second == {**first, "created": 0}
+    assert api.db.snapshot(*before) == after
+
+
+def test_exhausted_demo_balance_skips_new_periods_without_blocking_colleagues(api):
+    from app.provision_jana_people import provision as provision_people
+    from app.provision_jana_people_leave import provision
+
+    with api.db.session() as db:
+        provision_people(db)
+        db.commit()
+    existing = api.leave(key="existing-demo-1-full-balance", start_date="2026-11-10", end_date="2026-11-27")
+    manager = api.decide(existing, "manager")
+    assert manager.status_code == 200, manager.text
+    final = api.decide(manager.json(), "hr")
+    assert final.status_code == 200, final.text
+    assert api.db.adapter.balance("demo-1").balance == 0
+    before = api.db.snapshot("leave_requests", "request_history", "leave_deductions",
+        "zup_deliveries", "notifications", "audit_events")
+
+    with api.db.session() as db:
+        first = provision(db, as_of=date(2026, 10, 18))
+    assert first["created"] == first["requests"] == 26
+    assert first["skipped_overlaps"] == []
+    assert len(first["skipped_insufficient_balance"]) == 4
+    assert {row["zup_id"] for row in first["skipped_insufficient_balance"]} == {"demo-1"}
+    assert all(row["available_days"] == 0 for row in first["skipped_insufficient_balance"])
+    assert first["departments"] >= 7
+    assert api.db.adapter.balance("demo-1").balance == 0
+    after = api.db.snapshot(*before)
+    for table, original in before.items():
+        assert after[table][:len(original)] == original
+
+    with api.db.session() as db:
+        second = provision(db, as_of=date(2026, 10, 18))
     assert second == {**first, "created": 0}
     assert api.db.snapshot(*before) == after
