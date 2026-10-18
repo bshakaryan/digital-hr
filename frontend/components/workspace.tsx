@@ -17,6 +17,7 @@ import { Notifications } from "./notifications";
 import { IntegrationQueue } from "./integration-queue";
 import { EmployeeCalendar } from "./employee-calendar";
 import { FloatingJana } from "./floating-jana";
+import { EmployeeHomeDashboard } from "./employee-home-dashboard";
 
 type Tab = "home" | "profile" | "requests" | "academy" | "assistant" | "notifications" | "team" | "calendar" | "integrations" | "audit";
 const navigation: { tab: Tab; title: string; icon: IconName }[] = [
@@ -26,6 +27,7 @@ const navigation: { tab: Tab; title: string; icon: IconName }[] = [
   { tab: "calendar", title: "Календарь сотрудников", icon: "calendar" },
 ];
 const blankDraft: RequestDraft = { start_date: "", end_date: "", comment: "" };
+const currentMonth = () => new Date().toLocaleDateString("sv-SE").slice(0, 7);
 
 export function Workspace({ api, me: initialProfile, onLogout }: { api: ApiClient; me: Profile; onLogout: () => void }) {
   const profile = useResource<Profile>(api, "/me");
@@ -38,7 +40,8 @@ export function Workspace({ api, me: initialProfile, onLogout }: { api: ApiClien
   const [employeeId, setEmployeeId] = useState<number | null>(null);
   const [employeeView, setEmployeeView] = useState<"profile" | "calendar">("profile");
   const [calendarMode, setCalendarMode] = useState<"employees" | "mine">("employees");
-  const [calendarMonth, setCalendarMonth] = useState(() => new Date().toLocaleDateString("sv-SE").slice(0, 7));
+  const [calendarMonth, setCalendarMonth] = useState(currentMonth);
+  const [homeMonth, setHomeMonth] = useState(currentMonth);
   const requestReturn = useRef<string | null>(null);
   const [courseId, setCourseId] = useState<number | null>(null);
   const [replacement, setReplacement] = useState<LeaveRequest | null>(null);
@@ -55,6 +58,8 @@ export function Workspace({ api, me: initialProfile, onLogout }: { api: ApiClien
   const employees = useResource<Profile[]>(api, "/employees");
   const directory = useResource<DirectoryPerson[]>(api, "/directory");
   const sharedCalendar = useResource<SharedCalendar>(api, `/calendar?month=${calendarMonth}`);
+  const homeCalendar = useResource<SharedCalendar>(api, `/calendar?month=${homeMonth}`);
+  const currentHomeCalendar = homeCalendar.data?.month === homeMonth ? homeCalendar : { ...homeCalendar, data: null, loading: true };
   const [calculation, setCalculation] = useState<LeaveCalculation | null>(null);
   const [calculationError, setCalculationError] = useState("");
   const [calculationRevision, setCalculationRevision] = useState(0);
@@ -108,13 +113,13 @@ export function Workspace({ api, me: initialProfile, onLogout }: { api: ApiClien
     route(); window.addEventListener("hashchange", route);
     return () => window.removeEventListener("hashchange", route);
   }, [me.role]);
-  function changed() { requests.reload(); notifications.reload(); employees.reload(); profile.reload(); sharedCalendar.reload(); }
+  function changed() { requests.reload(); notifications.reload(); employees.reload(); profile.reload(); sharedCalendar.reload(); homeCalendar.reload(); }
   useEffect(() => {
-    const refresh = () => { profile.reload(); employees.reload(); requests.reload(); notifications.reload(); sharedCalendar.reload(); };
-    const timer = setInterval(() => { if (document.visibilityState === "visible") { requests.reload(); notifications.reload(); sharedCalendar.reload(); } }, 30000);
+    const refresh = () => { setHomeMonth(currentMonth()); profile.reload(); employees.reload(); requests.reload(); notifications.reload(); sharedCalendar.reload(); homeCalendar.reload(); };
+    const timer = setInterval(() => { if (document.visibilityState === "visible") { setHomeMonth(currentMonth()); requests.reload(); notifications.reload(); sharedCalendar.reload(); homeCalendar.reload(); } }, 30000);
     window.addEventListener("focus", refresh);
     return () => { window.removeEventListener("focus", refresh); clearInterval(timer); };
-  }, [profile.reload, employees.reload, requests.reload, notifications.reload, sharedCalendar.reload]);
+  }, [profile.reload, employees.reload, requests.reload, notifications.reload, sharedCalendar.reload, homeCalendar.reload]);
   useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(""), 5500); return () => clearTimeout(timer); }, [toast]);
 
   async function submitRequest(event: FormEvent) {
@@ -148,7 +153,7 @@ export function Workspace({ api, me: initialProfile, onLogout }: { api: ApiClien
     <div className="main-shell"><div className="context-bar"><div className="breadcrumb"><span>Моё пространство</span><Icon name="chevron" size={12} /><strong>{title}</strong></div></div>
     <main id="main-content" className={`main-content ${tab === "assistant" ? "assistant-page" : ""}`} tabIndex={-1} style={tab !== "assistant" ? { paddingBottom: "calc(112px + env(safe-area-inset-bottom))" } : undefined}>
       {profile.error && <ErrorBox message={`Не удалось обновить остаток: ${profile.error}`} retry={profile.reload} />}
-      {tab === "home" && <Dashboard me={me} requests={requests} courses={courses} notifications={notifications} onCreate={newDraft} onRequest={openRequest} onNotification={openNotification} navigate={navigate} />}
+      {tab === "home" && (me.role === "employee" ? <EmployeeHomeDashboard me={me} requests={requests} courses={courses} notifications={notifications} calendar={currentHomeCalendar} onRequestLeave={newDraft} onMyRequests={() => navigate("requests")} onMyCalendar={showMyCalendar} onMyLearning={() => navigate("academy")} onNotifications={() => navigate("notifications")} onOpenRequest={openRequest} onOpenNotification={openNotification} /> : <Dashboard me={me} requests={requests} courses={courses} notifications={notifications} onCreate={newDraft} onRequest={openRequest} onNotification={openNotification} navigate={navigate} />)}
       {tab === "profile" && <><PageHeading eyebrow="ЛИЧНОЕ" title="Мой профиль" action={<button type="button" className="button button-secondary" onClick={showMyCalendar}><Icon name="calendar" size={17} />Мой календарь</button>} /><ProfileCard me={me} /></>}
       {tab === "requests" && <Requests me={me} employees={employees.data} resource={requests} onCreate={newDraft} onOpen={openRequest} />}
       {tab === "academy" && <Academy api={api} courses={courses} role={me.role} initialCourseId={courseId} onChanged={() => { courses.reload(); notifications.reload(); }} notify={setToast} />}
