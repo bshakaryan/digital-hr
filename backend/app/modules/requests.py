@@ -29,8 +29,10 @@ def approval_route(employee: Employee):
 
 
 def final_reviewer_ids(db: Session, employee: Employee):
-    reviewer_role = "manager" if employee.role == "hr_admin" else "hr_admin"
-    return list(db.scalars(select(Employee.id).where(Employee.role == reviewer_role, Employee.id != employee.id)))
+    if employee.role == "hr_admin":
+        manager = db.get(Employee, employee.manager_id) if employee.manager_id is not None else None
+        return [manager.id] if manager and manager.role == "manager" and manager.id != employee.id else []
+    return list(db.scalars(select(Employee.id).where(Employee.role == "hr_admin", Employee.id != employee.id)))
 
 
 def review_allowed(user, employee, item):
@@ -39,11 +41,11 @@ def review_allowed(user, employee, item):
     route = approval_route(employee)
     if item.status == "submitted":
         return user.role == "manager" and (
-            (route == "standard" and employee.manager_id == user.id) or route == "hr_to_manager")
+            employee.manager_id == user.id and route in ("standard", "hr_to_manager"))
     if item.status == "manager_approved":
         return user.role == "hr_admin" and route in ("standard", "manager_to_hr")
     if item.status == "cancellation_requested":
-        return user.role == ("manager" if route == "hr_to_manager" else "hr_admin")
+        return (user.role == "manager" and employee.manager_id == user.id) if route == "hr_to_manager" else user.role == "hr_admin"
     return False
 
 
@@ -54,7 +56,6 @@ def visible_requests(user: Employee):
         return or_(
             LeaveRequest.employee_id == user.id,
             LeaveRequest.employee_id.in_(select(Employee.id).where(Employee.manager_id == user.id)),
-            LeaveRequest.employee_id.in_(select(Employee.id).where(Employee.role == "hr_admin")),
         )
     return LeaveRequest.employee_id == user.id
 
@@ -172,6 +173,11 @@ def new_request(db, user, data, idempotency_key, digest):
         if manager is None or manager.role != "manager":
             raise HTTPException(409, "Для сотрудника не настроен маршрут согласования с непосредственным руководителем")
         reviewers = [manager]
+    elif route == "hr_to_manager":
+        reviewer_ids = final_reviewer_ids(db, user)
+        if not reviewer_ids:
+            raise HTTPException(409, "Для заявки HR не назначен независимый руководитель-согласующий")
+        reviewers = [db.get(Employee, reviewer_ids[0])]
     else:
         reviewers = list(db.scalars(select(Employee).where(
             Employee.role == ("hr_admin" if route == "manager_to_hr" else "manager"), Employee.id != user.id)))

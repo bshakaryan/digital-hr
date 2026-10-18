@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Employee, LeaveRequest
-from app.modules.requests import visible_requests
+from app.modules.requests import review_allowed, visible_requests
 from app.schemas import CalendarAbsence, CalendarEmployee, EmployeeCalendar
 from app.security import current_user, visible_employee_ids
 
@@ -30,16 +30,19 @@ def calendar(
     request_ids = set(db.scalars(select(LeaveRequest.id).where(
         visible_requests(user), LeaveRequest.start_date <= last, LeaveRequest.end_date >= first,
     )))
-    people = db.execute(select(Employee.id, Employee.full_name, Employee.department).order_by(Employee.id)).all()
-    absences = db.execute(select(
-        LeaveRequest.id, LeaveRequest.employee_id, LeaveRequest.start_date, LeaveRequest.end_date, LeaveRequest.status,
-    ).where(
+    people = db.scalars(select(Employee).order_by(Employee.id)).all()
+    owners = {person.id: person for person in people}
+    absences = db.scalars(select(LeaveRequest).where(
         LeaveRequest.status.in_(("submitted", "manager_approved", "approved", "cancellation_requested")),
         LeaveRequest.start_date <= last, LeaveRequest.end_date >= first,
     ).order_by(LeaveRequest.id.desc())).all()
     response.headers["Cache-Control"] = "private, no-store"
     return EmployeeCalendar(
         month=month,
-        employees=[CalendarEmployee(**person._mapping, can_open_profile=person.id in profiles) for person in people],
-        absences=[CalendarAbsence(**item._mapping, can_open_request=item.id in request_ids) for item in absences],
+        employees=[CalendarEmployee(id=person.id, full_name=person.full_name, department=person.department,
+            can_open_profile=person.id in profiles) for person in people],
+        absences=[CalendarAbsence(id=item.id, employee_id=item.employee_id, start_date=item.start_date,
+            end_date=item.end_date, status=item.status, can_open_request=item.id in request_ids)
+            for item in absences if item.status == "approved" or item.employee_id == user.id
+            or (item.employee_id in owners and review_allowed(user, owners[item.employee_id], item))],
     )
