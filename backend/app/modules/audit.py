@@ -27,6 +27,7 @@ ACTION_LABELS = {
     "course.assigned": "Назначен курс", "course.self_enrolled": "Самостоятельная запись на курс",
     "course.assignment_reclassified": "Изменён учебный трек назначения",
     "course.progressed": "Обновлён прогресс курса", "course.completed": "Завершён курс",
+    "assistant.conversation_created": "Создан диалог AI Jana", "assistant.turn_created": "Добавлен ход диалога AI Jana",
     "documentolog.prepared": "Подготовлен документ", "documentolog.creation_started": "Начата отправка документа",
     "documentolog.session_created": "Создана сессия подписания", "documentolog.needs_review": "Документ требует сверки",
     "documentolog.signing": "Документ ожидает подписи", "documentolog.completed": "Имитация подписи завершена",

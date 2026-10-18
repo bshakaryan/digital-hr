@@ -234,6 +234,8 @@ class Completion(Input):
 
 class Question(Input):
     question: str = Field(min_length=3, max_length=1000)
+    conversation_id: int | None = Field(default=None, gt=0, strict=True)
+    client_turn_id: str | None = Field(default=None, min_length=1, max_length=100)
 
 
 class Source(BaseModel):
@@ -352,6 +354,46 @@ class AssistantOut(BaseModel):
     sources: list[Source]
     escalate_to_hr: bool
     mode: Literal["extractive_demo"] = "extractive_demo"
+    conversation_id: int | None = None
+    turn_id: int | None = None
+    client_turn_id: str | None = None
+
+
+class ConversationSummary(BaseModel):
+    id: int
+    course_id: int | None
+    title: str
+    created_at: UTCDateTime
+    updated_at: UTCDateTime
+
+
+class ConversationPage(BaseModel):
+    items: list[ConversationSummary]
+    total: int
+    page: int
+    page_size: int
+
+
+class ConversationMessage(BaseModel):
+    id: int
+    role: Literal["user", "assistant"]
+    text: str
+    sources: list[Source] = Field(default_factory=list)
+    escalate_to_hr: bool | None = None
+    mode: Literal["extractive_demo"] | None = None
+    client_turn_id: str | None = None
+    created_at: UTCDateTime
+
+
+class ConversationDetail(BaseModel):
+    id: int
+    course_id: int | None
+    created_at: UTCDateTime
+    updated_at: UTCDateTime
+    messages: list[ConversationMessage]
+    total_turns: int
+    page: int
+    page_size: int
 
 
 class AuditOut(BaseModel):

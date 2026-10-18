@@ -110,6 +110,22 @@ export interface LearningAnalytics {
 }
 export interface AssistantAnswer {
   answer: string; sources: Knowledge[]; escalate_to_hr: boolean; mode: "extractive_demo";
+  conversation_id?: number; turn_id?: number; client_turn_id?: string;
+}
+export interface AssistantConversation {
+  id: number; course_id: number | null; title: string; created_at: string; updated_at: string;
+}
+export interface AssistantConversationPage {
+  items: AssistantConversation[]; total: number; page: number; page_size: number;
+}
+export interface AssistantHistoryMessage {
+  id: number; role: "user" | "assistant"; text: string; sources: Knowledge[];
+  escalate_to_hr: boolean | null; mode: "extractive_demo" | null;
+  client_turn_id: string | null; created_at: string;
+}
+export interface AssistantConversationDetail {
+  id: number; course_id: number | null; created_at: string; updated_at: string;
+  messages: AssistantHistoryMessage[]; total_turns: number; page: number; page_size: number;
 }
 export interface AuditEntry {
   id: number; actor_id: number; action: string; entity_type: string; entity_id: number; created_at: string;
