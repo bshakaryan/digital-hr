@@ -27,12 +27,12 @@ def test_provider_receives_bounded_evidence_and_returns_safe_wording():
 
     def respond(request):
         requests.append(request)
-        return httpx.Response(200, json=completion("Заявку на отпуск можно отправить через сервис заявок."))
+        return httpx.Response(200, json=completion("Заявку на отпуск сотрудник отправляет через сервис заявок."))
 
     passage = "Заявку на отпуск сотрудник отправляет через сервис заявок."
     answer = generate_answer("Как отправить отпускную заявку?", passage, settings(),
                              transport=httpx.MockTransport(respond))
-    assert answer == "Заявку на отпуск можно отправить через сервис заявок."
+    assert answer == passage
     request = requests[0]
     assert request.url == "https://api.openai.com/v1/chat/completions"
     assert request.headers["Authorization"] == "Bearer test-provider-key"
@@ -51,6 +51,8 @@ def test_provider_errors_and_unsafe_outputs_use_fallback():
         httpx.Response(200, json=completion("Посмотрите example.xyz.")),
         httpx.Response(200, json=completion("Отпуск длится 999 дней.")),
         httpx.Response(200, json=completion("Заявка одобрена.")),
+        httpx.Response(200, json=completion("Отпуск автоматически одобряется после подачи заявки.")),
+        httpx.Response(200, json=completion("Заявку на отпуск можно отправить через сервис заявок.")),
         httpx.Response(200, json=completion("Заявку на отпуск можно отправить", "length")),
     ):
         result = generate_answer("Как отправить отпускную заявку?", passage, settings(),
@@ -63,6 +65,17 @@ def test_provider_errors_and_unsafe_outputs_use_fallback():
                            transport=httpx.MockTransport(lambda _: httpx.Response(200, json=completion("NO_EVIDENCE")))) == "NO_EVIDENCE"
     assert generate_answer("Как отправить отпускную заявку?", passage, settings(),
                            transport=httpx.MockTransport(lambda _: httpx.Response(200, json=completion("NO_EVIDENCE")))) == "NO_EVIDENCE"
+
+
+def test_provider_cannot_drop_negation_or_join_unrelated_source_sentences():
+    passage = "Заявка не одобряется автоматически. Сотрудник проверяет её статус в карточке."
+    for wording in ("Заявка одобряется автоматически.",
+                    "Сотрудник проверяет её статус в карточке. Заявка не одобряется автоматически."):
+        assert generate_answer("Что происходит с заявкой?", passage, settings(),
+            transport=httpx.MockTransport(lambda _: httpx.Response(200, json=completion(wording)))) is None
+    supported = httpx.Response(200, json=completion("Сотрудник проверяет её статус в карточке."))
+    assert generate_answer("Что происходит с заявкой?", passage, settings(),
+        transport=httpx.MockTransport(lambda _: supported)) == "Сотрудник проверяет её статус в карточке."
 
 
 def test_api_keeps_server_citation_and_extracts_on_provider_failure(api, monkeypatch):

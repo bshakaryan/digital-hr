@@ -2,6 +2,8 @@
 
 **Date:** 18 October 2026. **Evaluated checkout:** `codex/ai-jana-history-prep` at `d575677dffe2caf30addcfa2557d9332594a9621`. Local `main` moved from `0d39d3c0b6d726908cc35f5567ab2070ac161b8d` to `7b0b07640dd4f61184da0a797ba18ea38f033bce` during this audit. Assistant, retrieval, authorization and history modules and the corpus are unchanged between the evaluated checkout and the final `main`; `seed.py` differs in how many mock users receive the existing demo course, not in the six knowledge articles. This is an independent, small diagnostic set, not an estimate of production accuracy.
 
+The two P0 authorization/grounding defects found here were subsequently fixed and passed focused tests on a later local `main`; see [AI_JANA_P0_REGRESSION.md](AI_JANA_P0_REGRESSION.md). The 20-question matrix below is a historical result and has not been rerun after that fix.
+
 ## Evaluation basis and method
 
 The Challenge 02 rubric gives **AI Jana 15%** and judges answer quality, sources, refusal when evidence is absent, and access rights. The project's [transcription of the organizer PDF](audit-case-02.md) identifies the source as *Jana Post Terricon Hackathon 2026*, physical PDF page 18 (printed page 17). The evaluation below tests those dimensions, plus catalog discovery, course scope, and saved-conversation access.

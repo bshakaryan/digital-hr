@@ -1,6 +1,6 @@
 # AI Jana P0: citation authorization and grounded wording
 
-**Status, 18 October 2026:** two targeted expected-safe tests reproduce the findings in [the 20-question evaluation](AI_JANA_EVALUATION.md). They are intentionally **red** against the current backend. Agent A has changed tests and documentation only; the Integration Lead owns the implementation fix.
+**Status, 18 October 2026:** Agent A's two targeted tests reproduced the findings in [the 20-question evaluation](AI_JANA_EVALUATION.md). They were **red before the Integration Lead fix and green afterward** on isolated PostgreSQL. This document retains the original failure evidence; the current verification result is in [verification.md](verification.md).
 
 ## Reproduce without shared services
 
@@ -15,7 +15,7 @@ docker stop jana-ai-p0-pg
 
 The [`api` fixture](../backend/tests/conftest.py) creates a random schema, migrates it to Alembic `0014`, seeds synthetic users, and drops the schema at teardown. It sets `LLM_PROVIDER=disabled` for ordinary requests; the second test calls the real wording guard through `httpx.MockTransport`. The corpus file is `knowledge_base_docs/HR-01.pdf`. No production data, shared Compose container, persistent volume or external LLM is involved. The disposable container used for this run was stopped and removed afterward.
 
-**Observed result:** `2 failed, 1 warning in 6.93s`; both failures are the final safety assertions, not setup failures. The warning is the existing Starlette/httpx deprecation. No broad regression suite was run.
+**Baseline result on Agent A's checkout:** `2 failed, 1 warning in 6.93s`; both failures were final safety assertions, not setup failures. The Integration Lead reproduced `2 failed, 1 warning in 6.16s` on integrated `main`, then obtained `40 passed, 1 warning` across the focused assistant/security modules after the fix. The warning is the existing Starlette/httpx deprecation. No broad regression suite was run.
 
 ## Regression 1 — known citation after file restriction
 
@@ -25,7 +25,7 @@ After the change, the employee correctly receives **404** from `/api/knowledge-f
 
 **Root cause:** [`knowledge()` in `backend/app/modules/assistant.py`](../backend/app/modules/assistant.py) filters `KnowledgeDocument.access_scope` only. It does not join and check its parent `KnowledgeFile.access_scope`. General retrieval and historical citation reauthorization already check both scopes. A known document ID bypasses those safer paths.
 
-**Smallest Integration Lead change:** In `backend/app/modules/assistant.py`, make the direct source lookup use the same outer join and predicate as `allowed_documents`: the chunk must be readable **and**, when `file_id` is present, its parent file must be readable. Keep the 404 response for unauthorized and missing chunks. Verify a legacy chunk with no parent file still follows its own scope. No API shape or migration is needed.
+**Implemented change:** In `backend/app/modules/assistant.py`, the direct source lookup uses the same outer join and predicate as `allowed_documents`: the chunk must be readable **and**, when `file_id` is present, its parent file must be readable. Unauthorized and missing chunks return 404. Legacy chunks with no parent file continue to follow their own scope. No API shape or migration changed.
 
 ## Regression 2 — unsupported claim receives `[1]`
 
@@ -37,9 +37,9 @@ The selected `HR-01` §02 passage describes **submitting** a request. It does no
 
 **Root cause:** [`safe_answer()` in `backend/app/modules/assistant_llm.py`](../backend/app/modules/assistant_llm.py) allows a generated sentence when any terms overlap the passage and its numbers fit. The approval form «одобряется» is outside its narrow forbidden-output regex. [`answer_from_documents()` in `backend/app/modules/assistant.py`](../backend/app/modules/assistant.py) then adds a server citation to accepted wording without checking that the new claim is entailed by the passage. Prompt instructions alone do not enforce grounding.
 
-**Conservative Integration Lead fallback:** Until claim verification exists, accept generated wording only when each normalized sentence is a literal, contiguous span of the selected authorized passage. Reject any extra conclusion or paraphrase that cannot be verified this way and return `None` from `generate_answer`, so the existing server path uses its extracted evidence with the same authorized source and `[1]`. Preserve `NO_EVIDENCE` as a refusal with `sources=[]`; if the extracted evidence itself does not answer the question, refuse rather than cite it. This deliberately limits freeform LLM wording but keeps useful, cited extractive answers and needs no new provider, model or API contract. Disabling `LLM_PROVIDER` is an immediate configuration mitigation until the gate is fixed.
+**Conservative fallback now in place:** Generated wording is accepted only when it repeats one or more contiguous, complete sentences of the selected authorized passage, with only whitespace/case differences. Extra conclusions, paraphrases, dropped negations and reordered sentences return `None` from `generate_answer`, so the existing server path uses extracted evidence with the same authorized source and `[1]`. `NO_EVIDENCE` remains a refusal with `sources=[]`. This limits freeform wording; it does not prove that the selected evidence answers every question.
 
-**Smallest Integration Lead change:** Implement the fail-closed wording check in `backend/app/modules/assistant_llm.py`. Keep the existing `None` → extractive fallback and `NO_EVIDENCE` → refusal behavior in `backend/app/modules/assistant.py`. Update the existing loose-paraphrase expectations in `backend/tests/test_assistant_llm.py` to match the stricter gate; keep this P0 test as the API-level proof. Update `docs/ai-jana-llm.md`, `docs/api-contract.md` and `docs/verification.md` when the fix lands. No frontend, migration, retrieval rebuild, or new dependency is required.
+**Implemented change:** `backend/app/modules/assistant_llm.py` now applies that fail-closed check. Existing `None` → extractive fallback and `NO_EVIDENCE` → refusal behavior remain; mocked-provider tests and contract documentation were updated. No frontend, migration, retrieval rebuild or new dependency was required.
 
 ## Acceptance after the Integration Lead fix
 
@@ -47,3 +47,5 @@ The selected `HR-01` §02 passage describes **submitting** a request. It does no
 2. `employee` gets 404 for a known chunk after its parent file becomes HR-only; `hr_admin` still gets 200. Ordinary retrieval, history replay, file metadata and download remain consistent with this rule.
 3. The mock automatic-approval sentence never reaches `answer`, even with overlapping words. A supported extractive answer retains its server source and `[1]`; lack of adequate evidence produces the existing refusal without a citation.
 4. The focused assistant authorization and mocked-provider tests pass after updating expectations for the stricter generated-wording policy. Real-provider semantic accuracy remains unverified by these mocks.
+
+All four checks passed in the focused PostgreSQL run reported in [verification.md](verification.md). The historical 20-question retrieval matrix was not rerun; its six answer-quality failures remain separate work.

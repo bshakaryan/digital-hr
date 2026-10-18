@@ -80,9 +80,12 @@ def source(document, source_type="knowledge"):
 
 @router.get("/knowledge/{document_id}", response_model=Source, response_model_exclude_none=True)
 def knowledge(document_id: int, user: Employee = Depends(current_user), db: Session = Depends(get_db)):
-    item = db.scalar(select(KnowledgeDocument).where(
+    scopes = ["all", user.role]
+    item = db.scalar(select(KnowledgeDocument).outerjoin(KnowledgeFile,
+        KnowledgeFile.id == KnowledgeDocument.file_id).where(
         KnowledgeDocument.id == document_id,
-        KnowledgeDocument.access_scope.in_(["all", user.role]),
+        KnowledgeDocument.access_scope.in_(scopes),
+        or_(KnowledgeDocument.file_id.is_(None), KnowledgeFile.access_scope.in_(scopes)),
     ))
     if item is None:
         raise HTTPException(404, "Источник не найден")

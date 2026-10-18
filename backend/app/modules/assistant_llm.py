@@ -8,7 +8,6 @@ import re
 import httpx
 
 from app.config import Settings
-from app.modules.retrieval import terms
 
 
 SYSTEM_PROMPT = (
@@ -28,15 +27,21 @@ UNSAFE_OUTPUT = re.compile(
 )
 
 
+def _sentences(text: str) -> list[str]:
+    normalized = re.sub(r"\s+", " ", text).strip().casefold()
+    return [part.strip() for part in re.split(r"(?<=[.!?])\s+", normalized) if part.strip()]
+
+
 def safe_answer(answer: str, passage: str) -> bool:
     if not answer or len(answer) > 700 or UNSAFE_OUTPUT.search(answer):
         return False
-    if not terms(answer) & terms(passage):
-        return False
-    # New numbers are particularly risky in HR and legal answers.
-    return set(re.findall(r"\b\d+(?:[.,]\d+)?\b", answer)) <= set(
-        re.findall(r"\b\d+(?:[.,]\d+)?\b", passage)
-    )
+    # Word overlap cannot prove that a claim follows from the cited passage.
+    # Accept only contiguous, complete source sentences; otherwise use the
+    # existing extractive fallback. This also prevents dropping a negation.
+    source = _sentences(passage)
+    proposed = _sentences(answer)
+    return bool(proposed) and any(source[start:start + len(proposed)] == proposed
+                                  for start in range(len(source) - len(proposed) + 1))
 
 
 def generate_answer(question: str, passage: str, settings: Settings, *, transport=None) -> str | None:
