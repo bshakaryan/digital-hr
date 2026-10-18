@@ -12,8 +12,8 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.database import get_engine
-from app.models import Course, CourseAssignment, KnowledgeDocument, KnowledgeFile, Employee
-from app.modules.academy import attach_material, assign_course, complete, create_course_record, progress, publish_course, set_quiz
+from app.models import Course, CourseAssignment, CourseMaterial, KnowledgeDocument, KnowledgeFile, Employee
+from app.modules.academy import attach_material, assign_course, complete, create_course_record, edit_course, progress, publish_course, set_quiz
 from app.modules.academy_analytics import reference_date
 from app.schemas import AttachMaterial, Completion, CourseAssign, CourseDraft, CourseQuiz, Progress
 
@@ -58,12 +58,23 @@ LEARNING = {
     "hr@example.com": (("DEMO-ONB-03", "completed", 4), ("DEMO-CS-02", "not_started", 10)),
 }
 
+# New assignments only. The employee's existing demo courses are legacy and
+# cannot be reclassified or assigned a second time under another track.
+ONBOARDING = {
+    "employee@example.com": (("DEMO-ONB-03", "completed", 7), ("DEMO-LOG-02", "in_progress", 14),
+                             ("DEMO-SAFE-02", "not_started", 21), ("DEMO-CS-02", "not_started", 28)),
+}
+SELF_ENROLLABLE = frozenset({"DEMO-LOG-04", "DEMO-SAFE-03", "DEMO-CS-01"})
+DEMO_EMPLOYEES = {"employee@example.com": "demo-1", "manager@example.com": "demo-2",
+                  "outsider@example.com": "demo-4", "hr@example.com": "demo-3"}
+
 
 def provision() -> dict:
     if get_settings().zup_mode != "mock":
         raise RuntimeError("Academy demo provisioning is allowed only with ZUP_MODE=mock")
     as_of = reference_date()
     result = {"as_of": as_of.isoformat(), "created_courses": 0, "new_assignments": 0,
+              "new_onboarding_assignments": 0, "self_enrollable_enabled": 0,
               "completed": 0, "in_progress": 0, "existing_assignments": 0}
     with Session(get_engine()) as db:
         hr = db.scalar(select(Employee).where(Employee.email == "hr@example.com", Employee.zup_id == "demo-3"))
@@ -95,26 +106,46 @@ def provision() -> dict:
                 if not item.question:
                     set_quiz(item.id, CourseQuiz(question=spec.question, options=list(spec.options), correct_index=spec.correct), hr, db)
                 publish_course(item.id, hr, db)
-        for email, plan in LEARNING.items():
-            employee = db.scalar(select(Employee).where(Employee.email == email, Employee.zup_id.like("demo-%")))
-            if employee is None:
-                raise RuntimeError(f"Synthetic demo employee unavailable: {email}")
-            for code, state, offset in plan:
-                course = by_code[code]
-                existing = db.scalar(select(CourseAssignment).where(CourseAssignment.employee_id == employee.id, CourseAssignment.course_id == course.id))
-                if existing is not None:
-                    result["existing_assignments"] += 1
-                    continue
-                assigned = assign_course(course.id, CourseAssign(employee_id=employee.id, deadline=as_of + timedelta(days=offset)), hr, db)
-                if not assigned["assigned"]:
-                    raise RuntimeError(f"Unexpected duplicate assignment: {email} / {code}")
-                result["new_assignments"] += 1
-                if state in ("in_progress", "completed"):
-                    progress(course.id, Progress(progress=70), employee, db)
-                    result["in_progress"] += 1
-                if state == "completed":
-                    complete(course.id, Completion(answer_index=course.correct_index), employee, db)
-                    result["completed"] += 1
+        for code in sorted(by_code):
+            course = by_code[code]
+            classifications = db.scalars(select(KnowledgeFile.classification).join(CourseMaterial,
+                CourseMaterial.file_id == KnowledgeFile.id).where(CourseMaterial.course_id == course.id)).all()
+            if (course.status != "published" or not course.description.startswith("DEMO / SYNTHETIC.")
+                    or not classifications or any(value != "synthetic_demo" for value in classifications)):
+                raise RuntimeError(f"Course is no longer a published synthetic demo: {code}")
+        for code in sorted(SELF_ENROLLABLE):
+            course = by_code[code]
+            if not course.self_enrollable:
+                edit_course(course.id, CourseDraft(title=course.title, description=course.description,
+                    objectives=course.objectives, duration_minutes=course.duration_minutes,
+                    category=course.category, self_enrollable=True), hr, db)
+                result["self_enrollable_enabled"] += 1
+        for plans, track in ((LEARNING, "legacy"), (ONBOARDING, "onboarding")):
+            for email, plan in plans.items():
+                employee = db.scalar(select(Employee).where(Employee.email == email,
+                    Employee.zup_id == DEMO_EMPLOYEES[email]))
+                if employee is None:
+                    raise RuntimeError(f"Synthetic demo employee unavailable: {email}")
+                for code, state, offset in plan:
+                    course = by_code[code]
+                    existing = db.scalar(select(CourseAssignment).where(CourseAssignment.employee_id == employee.id,
+                        CourseAssignment.course_id == course.id))
+                    if existing is not None:
+                        result["existing_assignments"] += 1
+                        continue
+                    assigned = assign_course(course.id, CourseAssign(employee_id=employee.id,
+                        deadline=as_of + timedelta(days=offset), learning_track=track), hr, db)
+                    if not assigned["assigned"]:
+                        raise RuntimeError(f"Unexpected duplicate assignment: {email} / {code}")
+                    result["new_assignments"] += 1
+                    if track == "onboarding":
+                        result["new_onboarding_assignments"] += 1
+                    if state in ("in_progress", "completed"):
+                        progress(course.id, Progress(progress=70), employee, db)
+                        result["in_progress"] += 1
+                    if state == "completed":
+                        complete(course.id, Completion(answer_index=course.correct_index), employee, db)
+                        result["completed"] += 1
     return result
 
 
