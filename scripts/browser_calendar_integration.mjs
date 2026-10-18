@@ -6,6 +6,7 @@ const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_PACKAGE || "playwright");
 const origin = process.env.WEB_URL || "http://127.0.0.1:3000";
 const me = { id: 101, full_name: "Демо Сотрудник", role: "employee", email: "demo@example.com", position: "Специалист", department: "Логистика", company: "Демо", manager_id: 1, manager_name: "Демо Руководитель", hire_date: "2024-01-01", leave_balance: 20, data_source: "mock_zup" };
+const calendarPeople = [{ id: me.id, full_name: me.full_name, department: me.department, can_open_profile: true }, ...Array.from({ length: 33 }, (_, index) => ({ id: 102 + index, full_name: `Демо Коллега ${index + 1}`, department: "Логистика", can_open_profile: false }))];
 const request = { id: 501, employee_id: 101, employee_name: me.full_name, type: "leave", status: "approved", start_date: "2027-01-11", end_date: "2027-01-13", days_count: 3, calendar_days: 3, excluded_dates: [], calendar_version: "test-fixture", approval_route: "manager_to_hr", can_review: false, cancellation_allowed: false, cancellation_block_reason: "Демонстрационная проверка", cancellation_sync_status: null, cancellation_reference: null, zup_sync_status: "legacy", zup_reference: null, comment: "Демонстрационная заявка", version: 1, created_at: "2026-10-17T00:00:00Z", history: [] };
 const browser = await chromium.launch({ headless: true });
 try {
@@ -22,7 +23,7 @@ try {
       const month = url.searchParams.get("month");
       const json = path === "/api/me" ? me : path === "/api/requests" ? [request]
         : path === "/api/requests/501" ? request
-        : path === "/api/calendar" ? { month, employees: [{ id: me.id, full_name: me.full_name, department: me.department, can_open_profile: true }], absences: month === "2027-01" ? [{ id: request.id, employee_id: me.id, start_date: request.start_date, end_date: request.end_date, status: request.status, can_open_request: true }] : [] }
+        : path === "/api/calendar" ? { month, employees: calendarPeople, absences: month === "2027-01" ? [{ id: request.id, employee_id: me.id, start_date: request.start_date, end_date: request.end_date, status: request.status, can_open_request: true }] : [] }
         : path === "/api/employees" ? [me] : path === "/api/directory" ? []
         : path === "/api/courses/rewards" ? { xp: 0, level: 1, next_level_xp: 100, badges: [] } : [];
       return route.fulfill({ json });
@@ -40,6 +41,18 @@ try {
     await detail.getByRole("button", { name: "Закрыть" }).click();
     await page.getByRole("button", { name: "Общий", exact: true }).click();
     await page.locator(".team-calendar").waitFor();
+    const viewport = page.getByRole("region", { name: "Общий календарь отпусков с прокруткой", exact: true });
+    assert.equal(await viewport.getAttribute("tabindex"), "0");
+    assert.ok(await viewport.evaluate(node => node.scrollHeight > node.clientHeight));
+    await viewport.press("PageDown");
+    await page.waitForFunction(() => document.querySelector(".team-calendar-viewport").scrollTop > 0);
+    assert.ok(await viewport.evaluate(node => Math.abs(node.querySelector("thead th").getBoundingClientRect().top - node.getBoundingClientRect().top) < 2));
+    if (width === 390) {
+      await viewport.press("ArrowRight");
+      await page.waitForFunction(() => document.querySelector(".team-calendar-viewport").scrollLeft > 0);
+      assert.ok(await viewport.evaluate(node => Math.abs(node.querySelector("tbody th").getBoundingClientRect().left - node.getBoundingClientRect().left) < 2));
+    }
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     await page.goto(`${origin}/#requests`);
     await page.getByText("№501", { exact: false }).first().waitFor();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);

@@ -71,6 +71,7 @@ export function TeamCalendar({ resource, onOpen, onEmployee, month, onMonthChang
   const [pending, setPending] = useState(true);
   const [year, number] = month.split("-").map(Number);
   const days = new Date(Date.UTC(year, number, 0)).getUTCDate();
+  const monthLabel = new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${month}-01T00:00:00Z`));
   // Never paint the previous month's response under a newly selected month.
   const data = resource.data?.month === month ? resource.data : null;
   const people = (data?.employees || []).filter(person => !department || person.department === department);
@@ -88,7 +89,10 @@ export function TeamCalendar({ resource, onOpen, onEmployee, month, onMonthChang
     <div className="filter-grid"><label>Месяц<input type="month" value={month} onChange={event => { if (/^[1-9]\d{3}-(0[1-9]|1[0-2])$/.test(event.target.value)) onMonthChange(event.target.value); }} /></label><label>Подразделение<select value={department} onChange={event => setDepartment(event.target.value)}><option value="">Все подразделения</option>{[...new Set(data?.employees.map(person => person.department))].map(value => <option key={value}>{value}</option>)}</select></label><label className="checkbox-label"><input type="checkbox" checked={pending} onChange={event => setPending(event.target.checked)} /> Показывать ожидающие заявки</label></div>
     {resource.error && <ErrorBox message={`Не удалось обновить общий календарь: ${resource.error}`} retry={resource.reload} />}
     <div className="calendar-legend"><Status value="approved" /><Status value="submitted" /><Status value="manager_approved" /><Status value="cancellation_requested" /></div>
-    <section className="panel table-scroll">{!data && resource.loading ? <Loading label="Загружаем общий календарь…" /> : data ? <table className="team-calendar"><caption className="sr-only">Отпуска за {month}</caption><thead><tr><th scope="col">Сотрудник</th>{Array.from({ length: days }, (_, index) => <th key={index} scope="col">{index + 1}<small>{weekdays[new Date(Date.UTC(year, number - 1, index + 1)).getUTCDay()]}</small></th>)}</tr></thead><tbody>{people.map(person => <tr key={person.id}><th scope="row">{person.can_open_profile ? <button type="button" className="team-calendar-person" aria-label={`Открыть календарь: ${person.full_name}`} onClick={() => onEmployee(person.id)}>{person.full_name}</button> : <span className="team-calendar-person">{person.full_name}</span>}<small>{person.department}</small></th>{Array.from({ length: days }, (_, index) => {
+    <section className="panel team-calendar-window" aria-labelledby="team-calendar-title">
+      <header className="team-calendar-toolbar"><div><h2 id="team-calendar-title">Отпуска · {monthLabel}</h2><p id="team-calendar-scroll-hint">Прокручивайте календарь внутри окна ↔ ↕</p></div>{data && <span className="team-calendar-count">Сотрудников: {people.length}</span>}</header>
+      <div className="team-calendar-viewport" role="region" aria-label="Общий календарь отпусков с прокруткой" aria-describedby="team-calendar-scroll-hint" tabIndex={data && people.length ? 0 : undefined}>
+      {!data && resource.loading ? <Loading label="Загружаем общий календарь…" /> : data && !people.length ? <Empty icon="people" title="Сотрудники не найдены" text="Попробуйте выбрать другое подразделение." /> : data ? <table className="team-calendar"><caption className="sr-only">Отпуска за {month}</caption><thead><tr><th scope="col">Сотрудник</th>{Array.from({ length: days }, (_, index) => <th key={index} scope="col">{index + 1}<small>{weekdays[new Date(Date.UTC(year, number - 1, index + 1)).getUTCDay()]}</small></th>)}</tr></thead><tbody>{people.map(person => <tr key={person.id}><th scope="row">{person.can_open_profile ? <button type="button" className="team-calendar-person" aria-label={`Открыть календарь: ${person.full_name}`} onClick={() => onEmployee(person.id)}>{person.full_name}</button> : <span className="team-calendar-person">{person.full_name}</span>}<small>{person.department}</small></th>{Array.from({ length: days }, (_, index) => {
       const day = `${month}-${String(index + 1).padStart(2, "0")}`;
       const entries = items.filter(item => item.employee_id === person.id && item.start_date <= day && item.end_date >= day);
       const weekend = [0, 6].includes(new Date(`${day}T00:00:00Z`).getUTCDay());
@@ -98,7 +102,7 @@ export function TeamCalendar({ resource, onOpen, onEmployee, month, onMonthChang
         return item.can_open_request ? <button type="button" key={item.id} className={className} onClick={() => onOpen(item.id)} aria-label={label} title={label}>{index + 1}</button>
           : <span key={item.id} className={className} role="img" aria-label={label} title={label}>{index + 1}</span>;
       })}</td>;
-    })}</tr>)}</tbody></table> : null}</section>
+    })}</tr>)}</tbody></table> : null}</div></section>
     {data && !items.length && <p className="muted calendar-note">В выбранном месяце заявок нет.</p>}
     {overlaps.length > 0 && <section className="panel overlap-list"><h2>Пересекающиеся периоды · {overlaps.length}</h2><p className="muted small-text">Подсказка для планирования; пересечение сотрудников само по себе не запрещает отпуск.</p>{overlaps.map(({ left, right }) => <div key={`${left.id}-${right.id}`}>{period(left)}<span> и </span>{period(right)}<small>{date(left.start_date > right.start_date ? left.start_date : right.start_date)} — {date(left.end_date < right.end_date ? left.end_date : right.end_date)}</small></div>)}</section>}
   </>;
