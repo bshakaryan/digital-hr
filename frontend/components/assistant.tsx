@@ -1,17 +1,21 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ApiClient, errorMessage, type AssistantAnswer, type Knowledge } from "@/lib/api";
 import { Icon, Loading, Modal } from "./ui";
 import { useResource } from "./use-resource";
+import { createAssistantHistoryAdapter, type ChatHistoryAdapter, type ChatScope } from "./assistant-history-adapter";
+import { AssistantHistorySidebar } from "./assistant-history-sidebar";
+import { exchangesFromMessages, useAssistantHistory } from "./use-assistant-history";
 import styles from "./assistant-ux.module.css";
 
 const suggestions = ["Как подать заявку на отпуск?", "Как устроено обучение?", "Какие документы есть в базе знаний?"];
 const leaveQuestion = /(отпуск|демалыс|leave)/i;
 
-interface Exchange { question: string; result: AssistantAnswer }
+interface Exchange { id?: string; question: string; result: AssistantAnswer }
+const generalScope: ChatScope = { kind: "general" };
 
-export function Assistant({ api, onCreateLeave }: { api: ApiClient; onCreateLeave?: () => void }) {
+export function Assistant({ api, onCreateLeave, historyAdapter }: { api: ApiClient; onCreateLeave?: () => void; historyAdapter?: ChatHistoryAdapter | null }) {
   const [question, setQuestion] = useState("");
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [pending, setPending] = useState(false);
@@ -20,6 +24,10 @@ export function Assistant({ api, onCreateLeave }: { api: ApiClient; onCreateLeav
   const busy = useRef(false);
   const transcript = useRef<HTMLDivElement>(null);
   const followConversation = useRef(true);
+  const olderAnchor = useRef<number | null>(null);
+  const defaultHistoryAdapter = useMemo(() => createAssistantHistoryAdapter(api), [api]);
+  const history = useAssistantHistory(historyAdapter === undefined ? defaultHistoryAdapter : historyAdapter ?? undefined, generalScope);
+  const visibleExchanges: Exchange[] = history.enabled ? exchangesFromMessages(history.messages) : exchanges;
 
   useEffect(() => {
     if (!followConversation.current) return;
@@ -28,7 +36,20 @@ export function Assistant({ api, onCreateLeave }: { api: ApiClient; onCreateLeav
       if (container && followConversation.current) container.scrollTop = container.scrollHeight;
     });
     return () => cancelAnimationFrame(frame);
-  }, [exchanges.length, pending, error]);
+  }, [visibleExchanges.length, pending, error, history.messagesLoading, history.sendError]);
+
+  useLayoutEffect(() => {
+    if (olderAnchor.current === null || !transcript.current) return;
+    transcript.current.scrollTop = transcript.current.scrollHeight - olderAnchor.current;
+    olderAnchor.current = null;
+  }, [visibleExchanges.length]);
+
+  async function showOlder() {
+    followConversation.current = false;
+    const container = transcript.current;
+    if (container) olderAnchor.current = container.scrollHeight - container.scrollTop;
+    if (!(await history.loadOlderMessages())) olderAnchor.current = null;
+  }
 
   function trackReadingPosition() {
     const container = transcript.current;
@@ -51,9 +72,14 @@ export function Assistant({ api, onCreateLeave }: { api: ApiClient; onCreateLeav
     setPending(true);
     setError("");
     try {
-      const result = await api.post<AssistantAnswer>("/assistant/query", { question: trimmed });
-      setExchanges((old) => [...old, { question: trimmed, result }]);
-      setQuestion("");
+      if (history.enabled) {
+        if (await history.send(trimmed)) setQuestion("");
+        else setQuestion(trimmed);
+      } else {
+        const result = await api.post<AssistantAnswer>("/assistant/query", { question: trimmed });
+        setExchanges((old) => [...old, { question: trimmed, result }]);
+        setQuestion("");
+      }
     } catch (cause) {
       setQuestion(value);
       setError(errorMessage(cause));
@@ -78,9 +104,16 @@ export function Assistant({ api, onCreateLeave }: { api: ApiClient; onCreateLeav
         <div className={styles.identity}><h1>AI Jana</h1><span>Помощник по доступным документам</span></div>
         <span className={styles.headerBadge}>Демо</span>
       </header>
+      <div className={styles.chatBody}>
+      {history.enabled && <AssistantHistorySidebar conversations={history.conversations} selectedId={history.selectedId} loading={history.listLoading} loadingMore={history.listMoreLoading} error={history.listError} nextPage={history.nextPage} busy={pending} onNew={() => { history.newConversation(); setQuestion(""); followConversation.current = true; }} onSelect={(id) => { void history.openConversation(id); setQuestion(""); setSourceId(null); followConversation.current = true; }} onRetry={() => void history.refreshList()} onMore={() => void history.loadMoreConversations()} />}
+      <div className={styles.chatMain}>
       <div className={styles.transcript} ref={transcript} onScroll={trackReadingPosition} aria-label="Сообщения">
         <div className={styles.thread}>
-          {exchanges.length === 0 && <div className={styles.intro}>
+          {history.enabled && history.previousPage && <button type="button" className={styles.olderMessages} onClick={() => void showOlder()} disabled={history.olderLoading}>{history.olderLoading ? "Загружаем…" : "Показать предыдущие сообщения"}</button>}
+          {history.enabled && history.olderError && <div className={styles.error} role="alert">Не удалось загрузить предыдущие сообщения: {history.olderError} <button type="button" onClick={() => void showOlder()}>Повторить</button></div>}
+          {history.enabled && history.messagesLoading && <p className={styles.threadState} role="status">Открываем диалог…</p>}
+          {history.enabled && history.messagesError && <div className={styles.error} role="alert">Не удалось открыть историю: {history.messagesError} <button type="button" onClick={() => history.selectedId && void history.openConversation(history.selectedId)}>Повторить</button></div>}
+          {!history.messagesLoading && visibleExchanges.length === 0 && !history.messagesError && <div className={styles.intro}>
             <span className={styles.introMark} aria-hidden="true"><Icon name="spark" size={21} /></span>
             <div className={styles.introText}><strong>Сәлем! Чем могу помочь?</strong><p>Спросите о заявках, обучении или документах. Я покажу, на чём основан ответ.</p></div>
             <div className={styles.introOptions}>
@@ -90,7 +123,7 @@ export function Assistant({ api, onCreateLeave }: { api: ApiClient; onCreateLeav
               <div className={styles.quickActions}>{leaveAction()}<a className={styles.secondaryAction} href="#academy">Мои курсы <Icon name="arrow" size={15} /></a></div>
             </div>
           </div>}
-          {exchanges.map((exchange, index) => <div className={styles.turn} key={index}>
+          {visibleExchanges.map((exchange, index) => <div className={styles.turn} key={exchange.id || index}>
             <div className={styles.userRow}><div className={styles.userBubble}>{exchange.question}</div></div>
             <div className={styles.assistantRow}>
               <span className={styles.avatar} aria-label="AI Jana"><Icon name="spark" size={15} /></span>
@@ -105,11 +138,14 @@ export function Assistant({ api, onCreateLeave }: { api: ApiClient; onCreateLeav
           </div>)}
           {pending && <div className={styles.assistantRow} role="status"><span className={styles.avatar} aria-hidden="true"><Icon name="spark" size={15} /></span><span className={styles.loadingBubble}><span className={styles.loadingDots} aria-hidden="true"><i /><i /><i /></span> Ищу ответ в документах…</span></div>}
           {error && <div className={styles.error} role="alert"><span>Не удалось получить ответ: {error}</span><button type="button" onClick={() => void ask(question)} disabled={pending}>Повторить</button></div>}
+          {history.enabled && history.sendError && <div className={styles.error} role="alert"><span>Не удалось сохранить ответ: {history.sendError}</span><button type="button" onClick={() => void ask(question)} disabled={pending}>Повторить</button></div>}
         </div>
       </div>
       <div className={styles.composer}>
-        <form onSubmit={submit}><label className="sr-only" htmlFor="assistant-question">Ваш вопрос</label><textarea id="assistant-question" rows={2} placeholder="Напишите вопрос AI Jana…" minLength={3} maxLength={1000} required value={question} onChange={(event) => setQuestion(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void ask(question); } }} disabled={pending} /><button type="submit" aria-label="Отправить вопрос" disabled={pending || question.trim().length < 3}><Icon name="send" size={19} /></button></form>
+        <form onSubmit={submit}><label className="sr-only" htmlFor="assistant-question">Ваш вопрос</label><textarea id="assistant-question" rows={2} placeholder="Напишите вопрос AI Jana…" minLength={3} maxLength={1000} required value={question} onChange={(event) => setQuestion(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void ask(question); } }} disabled={pending || history.messagesLoading || Boolean(history.selectedId && history.messagesError)} /><button type="submit" aria-label="Отправить вопрос" disabled={pending || history.messagesLoading || Boolean(history.selectedId && history.messagesError) || question.trim().length < 3}><Icon name="send" size={19} /></button></form>
         <div className={styles.composerMeta}><span>Ответы могут опираться на демонстрационные материалы. Проверяйте источники.</span><span>{question.length}/1000</span></div>
+      </div>
+      </div>
       </div>
     </section>
     {sourceId !== null && <KnowledgeReader key={sourceId} api={api} id={sourceId} onClose={() => setSourceId(null)} />}
