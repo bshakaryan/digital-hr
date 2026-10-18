@@ -148,3 +148,55 @@ def answer_from_documents(question: str, documents, *, source_type="knowledge", 
         return AssistantOut(answer=prefix + (wording or passage) + " [1]",
                             sources=[source(document, source_type)], escalate_to_hr=False)
     return refusal
+
+
+COURSE_OVERVIEW_QUESTIONS = frozenset({
+    "о чем этот материал", "о чем материал", "о чем этот курс", "о чем курс",
+    "что изучается в этом курсе", "что изучается в этом материале",
+    "расскажи об этом материале", "расскажи об этом курсе",
+    "что важно запомнить",
+})
+COURSE_BOILERPLATE = re.compile(
+    r"практический контекст|практический пример|проверка понимания|ограничения и применение",
+    re.IGNORECASE,
+)
+
+
+def course_overview_question(question: str) -> bool:
+    normalized = " ".join(question.casefold().replace("ё", "е").split()).strip(" .?!")
+    return normalized in COURSE_OVERVIEW_QUESTIONS
+
+
+def course_overview_answer(course, documents) -> AssistantOut:
+    """Use only indexed passages from files readable in the assigned course."""
+    context = f"{course.title} {course.objectives or ''}"
+    specific_terms = terms(context) - {"демо", "курс", "матер", "учеб", "обуче"}
+    related = [document for _, document in ranked(context, documents, min_score=0)] if specific_terms else []
+    related_ids = {document.id for document in related}
+    # A generic course title can still have a readable attached file. In that
+    # case, quote its first substantive chunk and name that file explicitly.
+    remaining = sorted((document for document in documents if document.id not in related_ids),
+                       key=lambda document: (document.file_id or 0, document.chunk_index or 0, document.id))
+    for document in related + remaining:
+        opening = COURSE_BOILERPLATE.split(document.content, maxsplit=1)[0]
+        opening = " ".join(opening.split())
+        if opening.startswith(("JANA POST |", "DEMO / SYNTHETIC")):
+            continue
+        sentences = [part.strip() for part in re.split(r"(?<=[.!?])\s+", opening) if part.strip()]
+        if not sentences or len(sentences[0]) < 30 or len(sentences[0]) > 500:
+            continue
+        passage = " ".join(sentences[:2])
+        if len(passage) > 500:
+            passage = sentences[0]
+        if document.id in related_ids and not (specific_terms & terms(passage)):
+            continue
+        file = getattr(document, "file", None)
+        if file and file.classification == "external_legal_snapshot":
+            prefix = f"В предоставленной копии Трудового кодекса ({file.version}; актуальность не подтверждена): "
+        elif file and file.classification == "synthetic_demo":
+            prefix = f"По демонстрационному материалу «{document.title}»: "
+        else:
+            prefix = f"По материалу «{document.title}»: "
+        return AssistantOut(answer=prefix + passage + " [1]",
+                            sources=[source(document, "course")], escalate_to_hr=False)
+    return refusal_answer()
