@@ -75,9 +75,11 @@ def test_deadline_metrics_profiles_discovery_and_permissions(api):
     assert item["completed_at"] is not None
 
 
-def test_demo_provision_is_repeatable_and_preserves_existing_progress(api):
-    from app.models import CourseAssignment, KnowledgeDocument, KnowledgeFile
-    from app.provision_academy_demo import COURSES, provision
+def test_demo_provision_is_repeatable_and_preserves_existing_progress(api, monkeypatch):
+    from app.models import Course, CourseAssignment, KnowledgeDocument, KnowledgeFile
+    from app import provision_academy_demo as demo
+
+    COURSES, ONBOARDING, SELF_ENROLLABLE = demo.COURSES, demo.ONBOARDING, demo.SELF_ENROLLABLE
 
     with api.db.session() as db:
         hr_id = 3
@@ -96,13 +98,55 @@ def test_demo_provision_is_repeatable_and_preserves_existing_progress(api):
         old = db.scalar(select(CourseAssignment).where(CourseAssignment.employee_id == 1, CourseAssignment.course_id == 1))
         old.progress = 45
         db.commit()
-    first = provision()
-    assert first["created_courses"] == 12 and first["new_assignments"] == 16
-    assert first["completed"] == 4
+    # Reproduce the reported baseline before enabling onboarding and discovery.
+    with monkeypatch.context() as prior:
+        prior.setattr(demo, "ONBOARDING", {})
+        prior.setattr(demo, "SELF_ENROLLABLE", frozenset())
+        baseline = demo.provision()
+    assert baseline["created_courses"] == 12 and baseline["new_assignments"] == 16
+    assert baseline["completed"] == 4
+    old_before = api.db.snapshot("course_assignments")
+    assert len(old_before["course_assignments"]) == 20
+    with api.db.session() as db:
+        assert all(item.learning_track == "legacy" for item in db.scalars(select(CourseAssignment)).all())
+        assert all(not item.self_enrollable for item in db.scalars(select(Course).where(Course.demo_code.is_not(None))).all())
+    assert api.get("/api/courses/rewards").json()["xp"] == 200
+
+    first = demo.provision()
+    assert first["created_courses"] == 0 and first["new_assignments"] == 4
+    assert first["new_onboarding_assignments"] == 4 and first["self_enrollable_enabled"] == 3
+    assert first["completed"] == 1
+    assigned = api.get("/api/courses").json()
+    onboarding = [course for course in assigned if course["learning_track"] == "onboarding"]
+    assert len(onboarding) == 4
+    assert {course["title"] for course in onboarding} == {
+        f"Демо · {spec.title}" for spec in COURSES if spec.code in {code for code, _, _ in ONBOARDING["employee@example.com"]}}
+    assert sum(course["completed"] for course in onboarding) == 1
+    assert sorted(course["progress"] for course in onboarding) == [0, 0, 70, 100]
+    assert not any(course["learning_track"] == "onboarding" for course in api.get("/api/courses", "outsider").json())
+    assert api.get("/api/courses/rewards").json()["xp"] == 300
+    assert api.db.snapshot("course_assignments")["course_assignments"][:20] == old_before["course_assignments"]
+    catalog = api.get("/api/courses/discover").json()
+    assert sum(course["self_enrollable"] for course in catalog if course["is_demo"]) == 3
+    with api.db.session() as db:
+        assert sum(1 for code in SELF_ENROLLABLE if db.scalar(select(Course).where(Course.demo_code == code)).self_enrollable) == 3
+    assert api.get("/api/courses/catalog").status_code == 403
+    assert api.get("/api/courses/catalog", "hr").status_code == 200
+    assert api.get("/api/courses/analytics", "hr").status_code == 200
+    assert api.post(f"/api/courses/{onboarding[0]['id']}/assign", {"employee_id": 4}).status_code == 403
     snapshot = api.db.snapshot("courses", "course_assignments", "audit_events", "notifications")
-    second = provision()
+    second = demo.provision()
     assert second["created_courses"] == 0 and second["new_assignments"] == 0
+    assert second["new_onboarding_assignments"] == 0 and second["self_enrollable_enabled"] == 0
+    assert api.db.snapshot("courses", "course_assignments", "audit_events", "notifications") == snapshot
+    assert api.get("/api/courses/rewards").json()["xp"] == 300
+    # A previously assigned legacy course cannot gain an onboarding track by
+    # appearing in a future demo curriculum.
+    with monkeypatch.context() as conflict:
+        conflict.setattr(demo, "ONBOARDING", {"employee@example.com": (("DEMO-ONB-01", "completed", 7),)})
+        assert demo.provision()["new_onboarding_assignments"] == 0
     assert api.db.snapshot("courses", "course_assignments", "audit_events", "notifications") == snapshot
     with api.db.session() as db:
         old = db.scalar(select(CourseAssignment).where(CourseAssignment.employee_id == 1, CourseAssignment.course_id == 1))
-        assert old.progress == 45 and not old.completed
+        assert old.progress == 45 and not old.completed and old.learning_track == "legacy"
+        assert api.db.snapshot("course_assignments")["course_assignments"][:len(old_before["course_assignments"])] == old_before["course_assignments"]
