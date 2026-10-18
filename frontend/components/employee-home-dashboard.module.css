@@ -1,0 +1,68 @@
+.dashboard { display: grid; gap: 24px; max-width: 1320px; margin: 0 auto; color: var(--ink); }
+.intro { display: flex; align-items: end; justify-content: space-between; gap: 20px; padding: 6px 0 2px; }
+.eyebrow, .kicker { color: var(--green-dark); font-size: 10px; font-weight: 800; letter-spacing: .14em; }
+.intro h1 { margin: 6px 0 3px; font-size: clamp(27px, 3.2vw, 39px); line-height: 1.15; letter-spacing: -.035em; }
+.intro p { margin: 0; color: var(--muted); font-size: 14px; }
+.today { display: inline-flex; align-items: center; gap: 8px; flex: none; color: var(--muted); font-size: 12px; }
+.actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.action, .primaryAction { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; min-height: 88px; padding: 16px; border: 1px solid #e3e9e0; border-radius: 17px; background: #fff; color: var(--ink); text-align: left; cursor: pointer; transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
+.action:hover, .primaryAction:hover { border-color: #8cba85; box-shadow: 0 8px 22px #143a1a10; transform: translateY(-2px); }
+.action:focus-visible, .primaryAction:focus-visible, .link:focus-visible, .listButton:focus-visible, .courseButton:focus-visible, .notification:focus-visible { outline: 3px solid #71b86b; outline-offset: 3px; }
+.primaryAction { background: linear-gradient(135deg, #087d17, #006b11); border-color: #087d17; color: #fff; }
+.primaryAction:hover { border-color: #006b11; box-shadow: 0 8px 22px #096b1930; }
+.actionIcon { display: grid; place-items: center; width: 42px; height: 42px; flex: none; border-radius: 12px; background: #edf5e8; color: var(--green-dark); }
+.primaryAction .actionIcon { background: #ffffff25; color: #fff; }
+.action > span:nth-child(2), .primaryAction > span:nth-child(2) { display: grid; gap: 3px; min-width: 0; flex: 1; font-size: 13px; font-weight: 700; line-height: 1.25; }
+.action small, .primaryAction small { color: var(--muted); font-size: 10px; font-weight: 400; }
+.primaryAction small { color: #ffffffc9; }
+.action > svg:last-child, .primaryAction > svg:last-child { flex: none; opacity: .65; }
+.grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(290px, 1fr); gap: 18px; align-items: start; }
+.mainColumn, .sideColumn { display: grid; gap: 18px; min-width: 0; }
+.card { min-width: 0; padding: 23px 25px; border: 1px solid #e4e9e1; border-radius: 19px; background: #fff; box-shadow: 0 3px 18px #17241c06; }
+.card h2 { margin: 4px 0 0; font-size: 18px; line-height: 1.25; letter-spacing: -.02em; }
+.cardHeader { display: flex; align-items: start; justify-content: space-between; gap: 12px; margin-bottom: 15px; }
+.balance { display: flex; justify-content: space-between; align-items: center; gap: 16px; background: linear-gradient(110deg, #eff7eb, #fff); }
+.balance p, .context { margin: 7px 0 0; color: var(--muted); font-size: 12px; }
+.balance > strong { color: var(--green-dark); font-size: 37px; font-weight: 750; line-height: 1; white-space: nowrap; letter-spacing: -.05em; }
+.balance > strong span { margin-left: 5px; color: #46654c; font-size: 14px; font-weight: 600; letter-spacing: 0; }
+.link { display: inline-flex; align-items: center; gap: 6px; padding: 4px 0; border: 0; background: transparent; color: var(--green-dark); font: inherit; font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.link:hover { text-decoration: underline; }
+.list { display: grid; }
+.listButton, .notification { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; padding: 14px 0; border: 0; border-top: 1px solid #eef0ec; background: transparent; color: var(--ink); text-align: left; font: inherit; cursor: pointer; }
+.listButton:first-child, .notification:first-child { border-top: 0; }
+.listButton:hover strong, .notification:hover strong { color: var(--green-dark); }
+.listIcon, .headerIcon { display: grid; place-items: center; width: 38px; height: 38px; flex: none; border-radius: 11px; background: #f0f5ed; color: var(--green-dark); }
+.headerIcon { width: 36px; height: 36px; }
+.listText, .notification > span:nth-child(2) { display: grid; gap: 3px; min-width: 0; flex: 1; }
+.listText strong, .notification strong { overflow: hidden; font-size: 13px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.listText small, .notification small { color: var(--muted); font-size: 11px; }
+.listButton > svg, .notification > svg { flex: none; color: #87928a; }
+.month { color: var(--muted); font-size: 12px; text-transform: capitalize; white-space: nowrap; }
+.context { margin: -7px 0 13px; }
+.colleagueList { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.colleagueList li { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid #eef0ec; }
+.colleagueList li:first-child { border-top: 0; }
+.avatar { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 50%; background: #edf5e8; color: var(--green-dark); font-size: 13px; font-weight: 700; }
+.colleagueList li > span:last-child { display: grid; gap: 2px; min-width: 0; }
+.colleagueList strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.colleagueList small { color: var(--muted); font-size: 11px; }
+.courseTrack { display: inline-flex; padding: 4px 9px; border-radius: 999px; background: #edf5e8; color: var(--green-dark); font-size: 10px; font-weight: 700; }
+.course h3 { margin: 13px 0 5px; font-size: 17px; line-height: 1.3; }
+.course p { margin: 0; color: var(--muted); font-size: 11px; }
+.progressLabel { display: flex; justify-content: space-between; margin: 19px 0 7px; color: var(--muted); font-size: 11px; }
+.progressLabel strong { color: var(--ink); }
+.course progress { display: block; width: 100%; height: 7px; overflow: hidden; border: 0; border-radius: 999px; background: #e7eee4; accent-color: var(--green); }
+.course progress::-webkit-progress-bar { border-radius: 999px; background: #e7eee4; }
+.course progress::-webkit-progress-value { border-radius: 999px; background: var(--green); }
+.course progress::-moz-progress-bar { border-radius: 999px; background: var(--green); }
+.courseButton { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; margin-top: 18px; padding: 11px 13px; border: 1px solid #d7e7d2; border-radius: 10px; background: #f4f9f1; color: var(--green-dark); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.courseButton:hover { background: #e8f3e3; }
+.count { display: inline-grid; place-items: center; min-width: 21px; height: 21px; margin-left: 5px; padding: 0 5px; border-radius: 999px; background: #e8f4e3; color: var(--green-dark); font-size: 11px; vertical-align: middle; }
+.unreadDot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--green); }
+.notification > span:nth-child(2) { gap: 4px; }
+.notification + .link { margin-top: 7px; }
+.empty { margin: 17px 0 2px; padding: 13px 15px; border-radius: 11px; background: #f7f9f6; color: var(--muted); font-size: 12px; }
+@media (max-width: 1080px) { .actions { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .dashboard { gap: 17px; } .grid { grid-template-columns: minmax(0, 1fr); } .intro { align-items: start; } .today { margin-top: 6px; } }
+@media (max-width: 520px) { .intro { display: block; } .intro h1 { font-size: 29px; } .today { margin-top: 12px; } .actions { gap: 8px; } .action, .primaryAction { gap: 8px; min-height: 76px; padding: 11px; border-radius: 13px; } .actionIcon { width: 33px; height: 33px; border-radius: 9px; } .actionIcon svg { width: 18px; height: 18px; } .action > span:nth-child(2), .primaryAction > span:nth-child(2) { font-size: 11px; } .action small, .primaryAction small { font-size: 9px; } .action > svg:last-child, .primaryAction > svg:last-child { display: none; } .card { padding: 19px; border-radius: 15px; } .card h2 { font-size: 17px; } .balance > strong { font-size: 31px; } }
+@media (prefers-reduced-motion: reduce) { .action, .primaryAction { transition: none; } .action:hover, .primaryAction:hover { transform: none; } }
