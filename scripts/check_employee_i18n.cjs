@@ -31,6 +31,7 @@ for (const file of files) {
 }
 for (const key of used) assert.ok(messages.employeeMessages[key], `Missing Kazakh copy: ${key}`);
 assert.equal(kk.t('Главная'), 'Басты бет');
+assert.equal(kk.t('Заявка одобрена'), 'Өтінім мақұлданды');
 assert.equal(kk.t('Заявка №{0}', 42), '№42 өтінім');
 assert.equal(kk.t('Заявка №42 отправлена на согласование'), '№42 өтінім келісуге жіберілді');
 assert.equal(kk.t('Недостаточно дней отпуска: требуется 28, доступно 25'), 'Демалыс күндері жеткіліксіз: қажеті 28, қолжетімдісі 25');
