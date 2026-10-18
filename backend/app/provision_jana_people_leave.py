@@ -89,6 +89,7 @@ def provision(db: Session, *, as_of: date | None = None) -> dict:
         raise RuntimeError("Provision Jana People and the demo HR identity before leave scenarios")
 
     prepared = []
+    skipped_overlaps = []
     planned_periods = {}
     for spec in ALL_PLAN:
         owner = people[spec.zup_id]
@@ -118,9 +119,11 @@ def provision(db: Session, *, as_of: date | None = None) -> dict:
             continue
         overlap = db.scalar(select(LeaveRequest.id).where(LeaveRequest.employee_id == owner.id,
             LeaveRequest.status.in_(("submitted", "manager_approved", "approved", "cancellation_requested")),
-            LeaveRequest.start_date <= end, LeaveRequest.end_date >= start).limit(1))
+            LeaveRequest.start_date <= end, LeaveRequest.end_date >= start).order_by(LeaveRequest.id).limit(1))
         if overlap is not None:
-            raise RuntimeError(f"Existing leave overlaps demo period for {spec.zup_id}")
+            skipped_overlaps.append({"zup_id": spec.zup_id, "start_date": start.isoformat(),
+                "end_date": end.isoformat(), "existing_request_id": overlap})
+            continue
         prepared.append((spec, owner, manager, start, end, key, False))
 
     keys = [row[5] for row in prepared]
@@ -153,7 +156,7 @@ def provision(db: Session, *, as_of: date | None = None) -> dict:
     return {"month": months[0].strftime("%Y-%m"), "created": created,
         "requests": len(rows), "by_status": {status: sum(row.status == status for row in rows)
             for status in ("approved", "submitted", "manager_approved", "rejected")},
-        "departments": len({row.department for row in rows})}
+        "departments": len({row.department for row in rows}), "skipped_overlaps": skipped_overlaps}
 
 
 def main() -> None:

@@ -22,7 +22,7 @@ def test_provisioned_leave_is_valid_and_idempotent(api):
     first = populate(api)
     assert first == {"month": "2026-10", "created": 30, "requests": 30,
         "by_status": {"approved": 17, "submitted": 4, "manager_approved": 5, "rejected": 4},
-        "departments": 8}
+        "departments": 8, "skipped_overlaps": []}
     with api.db.session() as db:
         rows = db.scalars(select(LeaveRequest).where(LeaveRequest.idempotency_key.like("jana-people-leave-v1-%"))).all()
         assert len(rows) == len(ALL_PLAN) == 30
@@ -180,20 +180,53 @@ def test_provision_requires_mock_and_existing_synthetic_people(api, monkeypatch)
             get_settings.cache_clear()
 
 
-def test_existing_leave_overlap_stops_provision_without_rewriting_it(api):
+def test_existing_leave_overlap_skips_period_without_rewriting_it(api):
     from app.models import Employee, LeaveRequest
     from app.provision_jana_people import provision as provision_people
-    from app.provision_jana_people_leave import provision
+    from app import provision_jana_people_leave as demo
 
     with api.db.session() as db:
         provision_people(db)
-        owner = db.scalar(select(Employee).where(Employee.zup_id == "people-002"))
-        legacy = LeaveRequest(employee_id=owner.id, start_date=date(2026, 10, 3), end_date=date(2026, 10, 5),
-            status="approved", idempotency_key="preexisting-legacy-leave", payload_hash="legacy")
-        db.add(legacy)
         db.commit()
-    before = api.db.snapshot("leave_requests", "notifications", "audit_events")
+        original_plan = demo.ALL_PLAN
+        demo.ALL_PLAN = demo.PLAN
+        try:
+            assert demo.provision(db, as_of=date(2026, 10, 18))["created"] == 15
+        finally:
+            demo.ALL_PLAN = original_plan
+
+    existing = api.leave(key="existing-demo-1-october", start_date="2026-10-07", end_date="2026-10-09")
+    manager = api.decide(existing, "manager")
+    assert manager.status_code == 200, manager.text
+    final = api.decide(manager.json(), "hr")
+    assert final.status_code == 200, final.text
+    assert final.json()["status"] == "approved"
+    before = api.db.snapshot("leave_requests", "request_history", "leave_deductions",
+        "zup_deliveries", "notifications", "audit_events")
+    original_balance = api.db.adapter.balance("demo-1").balance
+
     with api.db.session() as db:
-        with pytest.raises(RuntimeError, match="Existing leave overlaps"):
-            provision(db, as_of=date(2026, 10, 18))
-    assert api.db.snapshot("leave_requests", "notifications", "audit_events") == before
+        first = demo.provision(db, as_of=date(2026, 10, 18))
+    assert first["created"] == 14
+    assert first["requests"] == 29
+    assert first["departments"] >= 7
+    assert first["skipped_overlaps"] == [{"zup_id": "demo-1", "start_date": "2026-10-07",
+        "end_date": "2026-10-09", "existing_request_id": existing["id"]}]
+    with api.db.session() as db:
+        owner = db.scalar(select(Employee).where(Employee.zup_id == "demo-1"))
+        assert db.scalar(select(LeaveRequest.id).where(LeaveRequest.employee_id == owner.id,
+            LeaveRequest.idempotency_key.like("%-demo-1-visible-approved-a"))) is None
+        other_approved = db.scalar(select(LeaveRequest).where(LeaveRequest.employee_id == owner.id,
+            LeaveRequest.idempotency_key.like("%-demo-1-visible-approved-b")))
+        assert other_approved is not None and other_approved.status == "approved"
+        assert db.scalar(select(LeaveRequest.id).where(
+            LeaveRequest.idempotency_key.like("%-demo-2-visible-approved-a"))) is not None
+    assert api.get("/api/calendar?month=2026-10", "outsider").json()["absences"]
+    after = api.db.snapshot(*before)
+    for table, original in before.items():
+        assert after[table][:len(original)] == original
+    assert api.db.adapter.balance("demo-1").balance == original_balance - other_approved.days_count
+    with api.db.session() as db:
+        second = demo.provision(db, as_of=date(2026, 10, 18))
+    assert second == {**first, "created": 0}
+    assert api.db.snapshot(*before) == after
