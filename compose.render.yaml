@@ -1,4 +1,4 @@
-# Local equivalent of render.yaml. This file is not executed by Render.
+# Local equivalent of the free render.yaml. This file is not executed by Render.
 # Separate project/volumes keep the regular development Compose stack intact.
 name: digital-hr-render-local
 
@@ -24,6 +24,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     init: true
+    mem_limit: 512m
     environment:
       DATABASE_URL: postgresql://jana:${POSTGRES_PASSWORD:?Generate .env with scripts/setup_env.py}@postgres:5432/jana
       JWT_SECRET: ${JWT_SECRET:?Generate .env with scripts/setup_env.py}
@@ -36,8 +37,6 @@ services:
       RENDER_EXTERNAL_URL: http://localhost:${RENDER_WEB_PORT:-10000}
     ports:
       - "127.0.0.1:${RENDER_WEB_PORT:-10000}:10000"
-    volumes:
-      - mock_data:/var/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -50,4 +49,3 @@ services:
 
 volumes:
   postgres_data:
-  mock_data:

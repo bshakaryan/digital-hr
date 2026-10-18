@@ -2,7 +2,7 @@
 
 ## Автоматический запуск на Render
 
-Для нового стека используйте корневой [`render.yaml`](../render.yaml): Blueprint создаёт Docker Web Service, PostgreSQL 17 и постоянный диск, связывает `DATABASE_URL` и генерирует секреты. Ручное копирование URL базы не требуется. Render не выполняет Docker Compose; локальный эквивалент подготовлен в `compose.render.yaml`. Ресурсы платные, список и стоимость проверяются перед Deploy. Пошаговый запуск, обновление и сохранение существующего сервиса описаны в [render.md](render.md). Настройки ниже относятся к ручному созданию Web Service.
+Для временного демо используйте корневой [`render.yaml`](../render.yaml): Blueprint создаёт Free Docker Web Service и Free PostgreSQL 17, связывает `DATABASE_URL` и генерирует секреты. Постоянного диска в бесплатном варианте нет: PostgreSQL действует 30 дней, mock-файлы теряются при замене контейнера. Платный вариант с постоянным mock-диском подготовлен отдельно в [`render.paid.yaml`](../render.paid.yaml). Render не выполняет Docker Compose; локальный эквивалент бесплатного варианта — `compose.render.yaml`. Пошаговый запуск, обновление и сохранение существующего сервиса описаны в [render.md](render.md). Настройки ниже относятся к ручному созданию Web Service.
 
 ## Один Docker Web Service и внешний PostgreSQL на Render
 

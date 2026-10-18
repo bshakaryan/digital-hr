@@ -6,7 +6,7 @@
 
 ## Запуск в Docker
 
-Для Render подготовлен [`render.yaml`](render.yaml): **New → Blueprint → bshakaryan/digital-hr → main → Deploy Blueprint**. Он создаёт Docker Web Service, PostgreSQL и диск `/var/data`, автоматически связывает `DATABASE_URL` и генерирует секреты. Это платные ресурсы; стоимость показывается перед запуском. Пароль демо-аккаунтов доступен в Environment Web Service как `DEMO_PASSWORD`. Полная [инструкция Render](docs/render.md) включает обновления и переход с существующего сервиса.
+Для временного демо на Render подготовлен бесплатный [`render.yaml`](render.yaml): **New → Blueprint → bshakaryan/digital-hr → main → Deploy Blueprint**. Он создаёт Free Docker Web Service и Free PostgreSQL, автоматически связывает `DATABASE_URL` и генерирует секреты. База действует 30 дней; сайт засыпает после 15 минут простоя, а mock-хранилища теряются при замене контейнера. Пароль демо-аккаунтов доступен в Environment Web Service как `DEMO_PASSWORD`. [Инструкция Render](docs/render.md) включает подключение PostgreSQL к существующему сайту. Платный вариант с постоянным mock-диском вынесен отдельно в `render.paid.yaml`.
 
 Render использует Blueprint вместо `docker compose up`. Локальный эквивалент этого деплоя запускается через [`compose.render.yaml`](compose.render.yaml); обычный Compose ниже сохраняет отдельные контейнеры всех сервисов. Корневой `Dockerfile` также можно настроить вручную с внешним PostgreSQL: [настройки одного сервиса](docs/deployment.md#один-docker-web-service-и-внешний-postgresql-на-render).
 

@@ -1,5 +1,6 @@
 # Render uses Blueprints, not Docker Compose. Local equivalent: compose.render.yaml.
-# Paid resources; review the estimate in Render before deploying.
+# Free, temporary demo: Postgres expires after 30 days; mock files are ephemeral.
+# Optional paid deployment with a persistent mock disk: render.paid.yaml.
 # yaml-language-server: $schema=https://render.com/schema/render.yaml.json
 services:
   - type: web
@@ -7,17 +8,13 @@ services:
     runtime: docker
     repo: https://github.com/bshakaryan/digital-hr.git
     branch: main
-    region: frankfurt
-    plan: 1c-2g
+    region: oregon
+    plan: free
     dockerfilePath: ./Dockerfile
     dockerContext: .
     autoDeployTrigger: "off"
     healthCheckPath: /api/health
     numInstances: 1
-    disk:
-      name: digital-hr-mocks
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -38,11 +35,10 @@ services:
 
 databases:
   - name: digital-hr-postgres
-    region: frankfurt
-    plan: 0.1c-256mb
+    region: oregon
+    plan: free
     postgresMajorVersion: "17"
     databaseName: jana
     user: jana
-    diskSizeGB: 1
     # Only Render's private network can connect; no public database access.
     ipAllowList: []

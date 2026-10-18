@@ -32,9 +32,10 @@ jobs:
 
           with urlopen("https://render.com/schema/render.yaml.json", timeout=30) as response:
               schema = json.load(response)
-          blueprint = yaml.safe_load(Path("render.yaml").read_text())
-          jsonschema.Draft202012Validator(schema).validate(blueprint)
-          print("Render Blueprint matches the official JSON schema")
+          for filename in ("render.yaml", "render.paid.yaml"):
+              blueprint = yaml.safe_load(Path(filename).read_text())
+              jsonschema.Draft202012Validator(schema).validate(blueprint)
+              print(f"{filename} matches the official JSON schema")
           PY
       - name: Validate the local Render equivalent
         run: docker compose --env-file /dev/null -f compose.render.yaml config --quiet
