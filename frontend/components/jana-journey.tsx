@@ -4,15 +4,16 @@ import type { AcademyRewards, Course } from "@/lib/api";
 import styles from "./jana-journey.module.css";
 
 const milestones = ["Приёмка", "Склад", "Сортировка", "Транспортировка", "Доставка"] as const;
-type JourneyCourse = Pick<Course, "completed" | "progress" | "title">;
+type JourneyCourse = Pick<Course, "completed" | "progress" | "title" | "learning_track">;
 
-/** The five stops are reached at 0%, 25%, 50%, 75%, and 100% of completed assignments. */
+/** The five stops use only verified onboarding completions at 0%, 25%, 50%, 75%, and 100%. */
 export function getJourneyState(courses: JourneyCourse[]) {
-  const total = courses.length;
-  const completed = courses.filter((course) => course.completed).length;
+  const onboarding = courses.filter((course) => course.learning_track === "onboarding");
+  const total = onboarding.length;
+  const completed = onboarding.filter((course) => course.completed).length;
   const percent = total ? Math.floor((completed / total) * 100) : 0;
   const currentIndex = total ? Math.min(milestones.length - 1, Math.floor((completed * (milestones.length - 1)) / total)) : -1;
-  const activeCourse = courses.reduce<JourneyCourse | null>((best, course) =>
+  const activeCourse = onboarding.reduce<JourneyCourse | null>((best, course) =>
     !course.completed && course.progress > 0 && (!best || course.progress > best.progress) ? course : best, null);
   return { total, completed, percent, currentIndex, activeCourse, delivered: total > 0 && completed === total };
 }
@@ -26,13 +27,14 @@ function TruckIcon() {
 }
 
 export function JanaJourney({ courses, rewards }: { courses: Course[]; rewards: AcademyRewards | null }) {
+  // Optional development assignments never affect the mandatory route.
   const journey = getJourneyState(courses);
   const currentName = journey.currentIndex >= 0 ? milestones[journey.currentIndex] : null;
 
   return <section className={styles.journey} aria-labelledby="jana-journey-title">
     <div className={styles.heading}>
-      <div><span className={styles.kicker}>JANA ACADEMY / МАРШРУТ ОБУЧЕНИЯ</span><h2 id="jana-journey-title">Jana Journey</h2><p>От приёмки до доставки — каждый завершённый курс продвигает вашу посылку.</p></div>
-      <div className={styles.summary} aria-live="polite"><strong>{journey.total ? `${journey.completed} / ${journey.total}` : "—"}</strong><span>{journey.total ? "курсов завершено" : "нет назначений"}</span></div>
+      <div><span className={styles.kicker}>JANA ACADEMY / АДАПТАЦИЯ</span><h2 id="jana-journey-title">Jana Journey</h2><p>От приёмки до доставки — каждый завершённый курс адаптации продвигает вашу посылку.</p></div>
+      <div className={styles.summary} aria-live="polite"><strong>{journey.total ? `${journey.completed} / ${journey.total}` : "—"}</strong><span>{journey.total ? "курсов завершено" : "нет курсов адаптации"}</span></div>
     </div>
 
     <ol className={styles.route} aria-label="Пять этапов учебного маршрута">
@@ -49,11 +51,11 @@ export function JanaJourney({ courses, rewards }: { courses: Course[]; rewards: 
     </ol>
 
     <div className={styles.footer}>
-      <div className={styles.explanation}><TruckIcon /><span>{journey.total === 0 ? "Маршрут начнётся, когда HR назначит вам курс." : journey.delivered ? "Доставка завершена: все назначенные курсы пройдены." : `Сейчас: ${currentName}. Следующий этап откроется после завершения назначенных курсов.`}</span></div>
+      <div className={styles.explanation}><TruckIcon /><span>{journey.total === 0 ? "Маршрут начнётся, когда HR назначит курс адаптации." : journey.delivered ? "Доставка завершена: все курсы адаптации пройдены." : `Сейчас: ${currentName}. Следующий этап откроется после завершения курсов адаптации.`}</span></div>
       {journey.total > 0 && <span className={styles.rate}>{journey.percent}% маршрута</span>}
     </div>
     {journey.activeCourse && <p className={styles.activeCourse}>В изучении: <strong>{journey.activeCourse.title}</strong> · прогресс курса {journey.activeCourse.progress}%</p>}
     {rewards && <div className={styles.rewards} aria-label="Награды из Jana Academy"><span>{rewards.xp} XP</span><span>Уровень {rewards.level}</span><span>Значков: {rewards.badges.length}</span></div>}
-    <p className={styles.rule}>Этапы соответствуют 0%, 25%, 50%, 75% и 100% завершённых назначений. Отметка изучения материала сама по себе не продвигает посылку.</p>
+    <p className={styles.rule}>Этапы соответствуют 0%, 25%, 50%, 75% и 100% завершённых назначений адаптации. Курсы развития и отметка изучения материала не продвигают посылку.</p>
   </section>;
 }

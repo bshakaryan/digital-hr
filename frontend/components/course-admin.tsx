@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
-import { ApiClient, errorMessage, type CourseCatalogItem, type CourseCategory, type KnowledgeFile, type Profile } from "@/lib/api";
+import { ApiClient, errorMessage, type CourseCatalogItem, type CourseCategory, type EmployeeLearning, type KnowledgeFile, type Profile } from "@/lib/api";
 import { categoryLabel } from "@/lib/academy-labels";
 import { Empty, ErrorBox, Icon, Loading } from "./ui";
 import { useResource } from "./use-resource";
 import { KnowledgeAdmin } from "./knowledge-admin";
 import styles from "./academy-ux.module.css";
 
-type CourseDraft = { title: string; description: string; objectives: string; duration_minutes: number; category: CourseCategory };
+type CourseDraft = { title: string; description: string; objectives: string; duration_minutes: number; category: CourseCategory; self_enrollable: boolean };
 const scopeLabel: Record<KnowledgeFile["access_scope"], string> = {
   all: "все роли", employee: "сотрудники", manager: "руководители", hr_admin: "только HR",
 };
@@ -66,6 +66,7 @@ export function CourseAdmin({ api, notify }: { api: ApiClient; notify: (message:
   const [objectives, setObjectives] = useState("");
   const [duration, setDuration] = useState("10");
   const [category, setCategory] = useState<CourseCategory>("general");
+  const [selfEnrollable, setSelfEnrollable] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -73,10 +74,10 @@ export function CourseAdmin({ api, notify }: { api: ApiClient; notify: (message:
     event.preventDefault();
     if (busy) return;
     setBusy(true); setError("");
-    const body: CourseDraft = { title: title.trim(), description: description.trim(), objectives: objectives.trim(), duration_minutes: Number(duration), category };
+    const body: CourseDraft = { title: title.trim(), description: description.trim(), objectives: objectives.trim(), duration_minutes: Number(duration), category, self_enrollable: selfEnrollable };
     try {
       const item = await api.post<CourseCatalogItem>("/courses", body);
-      setSelected(item); setCreating(false); setNewCourse(true); catalog.reload(); setTitle(""); setDescription(""); setObjectives(""); setDuration("10"); setCategory("general");
+      setSelected(item); setCreating(false); setNewCourse(true); catalog.reload(); setTitle(""); setDescription(""); setObjectives(""); setDuration("10"); setCategory("general"); setSelfEnrollable(false);
       notify("Черновик курса создан. Прикрепите материал и подготовьте тест.");
     } catch (cause) { setError(errorMessage(cause)); }
     finally { setBusy(false); }
@@ -94,6 +95,7 @@ export function CourseAdmin({ api, notify }: { api: ApiClient; notify: (message:
         <label>Название курса<input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={200} required /></label>
         <label>Длительность, мин.<input type="number" min={1} max={480} value={duration} onChange={(event) => setDuration(event.target.value)} required /></label>
         <label className="academy-admin-wide">Категория<select value={category} onChange={(event) => setCategory(event.target.value as CourseCategory)}>{Object.entries(categoryLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <label className={styles.enrollmentSetting}><input type="checkbox" checked={selfEnrollable} onChange={(event) => setSelfEnrollable(event.target.checked)} /><span><strong>Открыть самостоятельную запись</strong><small>После публикации курс появится в каталоге «Моё развитие».</small></span></label>
         <label className="academy-admin-wide">Краткое описание<input value={description} onChange={(event) => setDescription(event.target.value)} maxLength={2000} required /></label>
         <label className="academy-admin-wide">Цели обучения<textarea value={objectives} onChange={(event) => setObjectives(event.target.value)} maxLength={2000} required /></label>
         <button className="button button-primary" disabled={busy}>{busy ? "Создаём…" : "Создать черновик"}</button>
@@ -111,6 +113,7 @@ function CourseEditor({ api, initial, initialStep, notify, onCatalogChanged }: {
   const [objectives, setObjectives] = useState(initial.objectives);
   const [duration, setDuration] = useState(String(initial.duration_minutes));
   const [category, setCategory] = useState<CourseCategory>(initial.category);
+  const [selfEnrollable, setSelfEnrollable] = useState(initial.self_enrollable);
   const [question, setQuestion] = useState(initial.question);
   const [options, setOptions] = useState(initial.options.length >= 2 ? initial.options : ["", ""]);
   const [correct, setCorrect] = useState(initial.correct_index);
@@ -118,11 +121,14 @@ function CourseEditor({ api, initial, initialStep, notify, onCatalogChanged }: {
   const [employeeIds, setEmployeeIds] = useState<number[]>([]);
   const [employeeSearch, setEmployeeSearch] = useState("");
   const [deadline, setDeadline] = useState("");
+  const [assignmentTrack, setAssignmentTrack] = useState<"" | "onboarding" | "development">("");
+  const [legacyTargets, setLegacyTargets] = useState<Record<number, "onboarding" | "development">>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const files = useResource<KnowledgeFile[]>(api, "/knowledge-files");
   const materials = useResource<KnowledgeFile[]>(api, `/courses/${course.id}/materials`);
   const employees = useResource<Profile[]>(api, "/employees");
+  const learningProfiles = useResource<EmployeeLearning[]>(api, "/courses/analytics/employees");
 
   async function run(action: () => Promise<CourseCatalogItem | void>, success: string) {
     if (busy) return;
@@ -137,7 +143,7 @@ function CourseEditor({ api, initial, initialStep, notify, onCatalogChanged }: {
 
   function saveDetails(event: FormEvent) {
     event.preventDefault();
-    void run(() => api.patch<CourseCatalogItem>(`/courses/${course.id}`, { title: title.trim(), description: description.trim(), objectives: objectives.trim(), duration_minutes: Number(duration), category }), "Данные курса сохранены.");
+    void run(() => api.patch<CourseCatalogItem>(`/courses/${course.id}`, { title: title.trim(), description: description.trim(), objectives: objectives.trim(), duration_minutes: Number(duration), category, self_enrollable: selfEnrollable }), "Данные курса сохранены.");
   }
   function saveQuiz(event: FormEvent) {
     event.preventDefault();
@@ -152,7 +158,7 @@ function CourseEditor({ api, initial, initialStep, notify, onCatalogChanged }: {
   }
   async function assign(event: FormEvent) {
     event.preventDefault();
-    if (busy || employeeIds.length === 0) return;
+    if (busy || employeeIds.length === 0 || !assignmentTrack) return;
     setBusy(true); setError("");
     let assigned = 0;
     let existing = 0;
@@ -160,7 +166,7 @@ function CourseEditor({ api, initial, initialStep, notify, onCatalogChanged }: {
     const failureMessages: string[] = [];
     for (const id of employeeIds) {
       try {
-        const result = await api.post<{ assigned: boolean }>(`/courses/${course.id}/assign`, { employee_id: id, deadline: deadline || null });
+        const result = await api.post<{ assigned: boolean }>(`/courses/${course.id}/assign`, { employee_id: id, deadline: deadline || null, learning_track: assignmentTrack });
         if (result.assigned) assigned += 1;
         else existing += 1;
       } catch (cause) {
@@ -170,9 +176,22 @@ function CourseEditor({ api, initial, initialStep, notify, onCatalogChanged }: {
       }
     }
     setEmployeeIds(failed);
+    learningProfiles.reload();
     setBusy(false);
     if (assigned || existing) notify(`Назначено: ${assigned}. Уже было назначено: ${existing}.`);
     if (failed.length) setError(`Не удалось назначить курс (${failed.length}): ${failureMessages.join("; ")}`);
+  }
+
+  async function classifyLegacy(employeeId: number) {
+    const target = legacyTargets[employeeId];
+    if (!target || busy) return;
+    setBusy(true); setError("");
+    try {
+      await api.patch(`/courses/${course.id}/assignments/${employeeId}/track`, { learning_track: target });
+      learningProfiles.reload();
+      notify("Трек назначения уточнён. Прогресс и завершение сохранены.");
+    } catch (cause) { setError(errorMessage(cause)); }
+    finally { setBusy(false); }
   }
 
   const learnerList = employees.data?.filter((person) => person.role !== "hr_admin") || [];
@@ -187,6 +206,7 @@ function CourseEditor({ api, initial, initialStep, notify, onCatalogChanged }: {
   const hasLearnerMaterial = !!materials.data?.some((file) => file.access_scope !== "hr_admin");
   const hasQuiz = !!course.question && course.options.length >= 2;
   const availableFiles = files.data?.filter((file) => !materials.data?.some((attached) => attached.id === file.id)) || [];
+  const legacyAssignments = learningProfiles.data?.flatMap((person) => person.assignments.filter((item) => item.course_id === course.id && item.learning_track === "legacy")) ?? [];
 
   function goToStep(next: EditorStep) {
     setStep(next);
@@ -202,6 +222,7 @@ function CourseEditor({ api, initial, initialStep, notify, onCatalogChanged }: {
       <label>Название<input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={200} required /></label>
       <label>Длительность, мин.<input type="number" min={1} max={480} value={duration} onChange={(event) => setDuration(event.target.value)} required /></label>
       <label className="academy-admin-wide">Категория<select value={category} onChange={(event) => setCategory(event.target.value as CourseCategory)}>{Object.entries(categoryLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+      <label className={styles.enrollmentSetting}><input type="checkbox" checked={selfEnrollable} onChange={(event) => setSelfEnrollable(event.target.checked)} /><span><strong>Открыть самостоятельную запись</strong><small>Опубликованный курс станет доступен для записи в «Моём развитии».</small></span></label>
       <label className="academy-admin-wide">Описание<input value={description} onChange={(event) => setDescription(event.target.value)} maxLength={2000} required /></label>
       <label className="academy-admin-wide">Цели обучения<textarea value={objectives} onChange={(event) => setObjectives(event.target.value)} maxLength={2000} required /></label>
       <button className="button button-secondary" disabled={busy}>Сохранить изменения</button>
@@ -219,14 +240,18 @@ function CourseEditor({ api, initial, initialStep, notify, onCatalogChanged }: {
         {course.status === "draft" ? <div className="academy-inline"><button type="button" className="text-button" onClick={() => setOptions((old) => [...old, ""])} disabled={options.length >= 4}>Добавить вариант</button><button type="button" className="text-button" onClick={() => { setOptions((old) => old.slice(0, -1)); setCorrect(0); }} disabled={options.length <= 2}>Убрать последний</button><button className="button button-secondary" disabled={busy}>Сохранить тест</button></div> : <p className="academy-field-note">Тест опубликован и защищён от изменений, чтобы условия обучения оставались прежними.</p>}</form>
     </section>}
     {step === "preview" && <section className="academy-step-content"><div className="academy-step-heading"><h4>Предпросмотр курса</h4><p>Так сотрудник увидит основные сведения до начала обучения. Ответ на тест здесь не раскрывается.</p></div><div className="academy-preview-card"><span className="small-label">JANA ACADEMY · {course.duration_minutes} МИН.</span><h3>{course.title}</h3><p>{course.description}</p>{course.objectives && <div className="course-objectives"><strong>После курса вы сможете</strong><p>{course.objectives}</p></div>}<h4>Материалы</h4>{materials.loading && !materials.data ? <Loading /> : materials.data?.length ? <ul className="academy-preview-list">{materials.data.map((file) => <li key={file.id}><Icon name="document" size={17} />{file.title} · {file.filename}</li>)}</ul> : <p className="academy-field-note">Материалы ещё не прикреплены.</p>}<h4>Проверка знаний</h4>{hasQuiz ? <div className="academy-preview-question"><strong>{course.question}</strong>{course.options.map((option, index) => <span key={index}>{option}</span>)}</div> : <p className="academy-field-note">Тест ещё не сохранён.</p>}</div></section>}
-    {step === "publish" && <section className="academy-step-content"><div className="academy-step-heading"><h4>Публикация и назначение</h4><p>Проверьте готовность курса. Ученики увидят его только после назначения.</p></div><div className="academy-readiness" aria-label="Готовность курса"><div><Icon name="check" size={17} /><span>Описание и цели сохранены</span></div><div className={hasLearnerMaterial ? "is-ready" : "is-missing"}><Icon name={hasLearnerMaterial ? "check" : "info"} size={17} /><span>{hasLearnerMaterial ? "Материал доступен ученику" : "Нужен материал, доступный сотруднику"}</span></div><div className={hasQuiz ? "is-ready" : "is-missing"}><Icon name={hasQuiz ? "check" : "info"} size={17} /><span>{hasQuiz ? "Контрольный вопрос сохранён" : "Сохраните контрольный вопрос"}</span></div></div>
+    {step === "publish" && <section className="academy-step-content"><div className="academy-step-heading"><h4>Публикация и назначение</h4><p>После публикации HR может назначить курс. Самостоятельная запись доступна только при включённой настройке курса.</p></div><div className="academy-readiness" aria-label="Готовность курса"><div><Icon name="check" size={17} /><span>Описание и цели сохранены</span></div><div className={hasLearnerMaterial ? "is-ready" : "is-missing"}><Icon name={hasLearnerMaterial ? "check" : "info"} size={17} /><span>{hasLearnerMaterial ? "Материал доступен ученику" : "Нужен материал, доступный сотруднику"}</span></div><div className={hasQuiz ? "is-ready" : "is-missing"}><Icon name={hasQuiz ? "check" : "info"} size={17} /><span>{hasQuiz ? "Контрольный вопрос сохранён" : "Сохраните контрольный вопрос"}</span></div></div>
       {course.status === "draft" ? <button type="button" className="button button-primary" disabled={busy || !hasLearnerMaterial || !hasQuiz || materials.loading} onClick={publish}>{busy ? "Публикуем…" : "Опубликовать курс"}</button> : <><div className="academy-published" role="status"><Icon name="check" size={20} /><span>Курс опубликован. Выберите сотрудников для назначения.</span></div><form className="academy-assignment" onSubmit={assign}>
+        <label className="academy-assignment-search">Учебный трек<select value={assignmentTrack} onChange={(event) => setAssignmentTrack(event.target.value as typeof assignmentTrack)} required><option value="">Выберите трек назначения</option><option value="onboarding">Адаптация · обязательный курс</option><option value="development">Моё развитие · дополнительный курс</option></select></label>
         <label className="academy-assignment-search">Сотрудники<input type="search" value={employeeSearch} onChange={(event) => setEmployeeSearch(event.target.value)} placeholder="Поиск по имени или отделу" /></label>
         <label className="academy-assignment-search">Срок прохождения <span className="optional">· необязательно</span><input type="date" value={deadline} onChange={(event) => setDeadline(event.target.value)} /></label>
         <div className="academy-assignment-toolbar"><button className="text-button" type="button" onClick={toggleVisible} disabled={busy || !visibleLearners.length}>{allVisibleSelected ? "Снять выбор с найденных" : "Выбрать всех найденных"}</button><span>Выбрано: {employeeIds.length}</span></div>
         <fieldset className="academy-assignment-list" disabled={busy}><legend className="sr-only">Кому назначить курс</legend>{visibleLearners.map((person) => <label className="academy-assignment-person" key={person.id}><input type="checkbox" checked={employeeIds.includes(person.id)} onChange={() => setEmployeeIds((current) => current.includes(person.id) ? current.filter((id) => id !== person.id) : [...current, person.id])} /><span><strong>{person.full_name}</strong><small>{person.department} · {person.role === "manager" ? "Руководитель" : "Сотрудник"}</small></span></label>)}{!visibleLearners.length && <p>{employees.loading ? "Загружаем сотрудников…" : "Сотрудники не найдены"}</p>}</fieldset>
-        <button className="button button-primary" disabled={busy || !employeeIds.length}>{busy ? "Назначаем…" : `Назначить курс (${employeeIds.length})`}</button>
+        <button className="button button-primary" disabled={busy || !employeeIds.length || !assignmentTrack}>{busy ? "Назначаем…" : `Назначить курс (${employeeIds.length})`}</button>
       </form></>}
+      {course.status === "published" && <div className={styles.legacyReview}><div><h4>Ранее назначенные курсы без трека</h4><p>Уточнение трека не меняет срок, прогресс, завершение или XP. Уже выбранный трек нельзя изменить здесь.</p></div>
+        {learningProfiles.error ? <ErrorBox message={learningProfiles.error} retry={learningProfiles.reload} /> : learningProfiles.loading && !learningProfiles.data ? <Loading /> : legacyAssignments.length ? <ul>{legacyAssignments.map((item) => <li key={item.employee_id}><span><strong>{item.employee_name}</strong><small>{item.status === "completed" ? "Завершён" : `Прогресс ${item.progress}%`}</small></span><select aria-label={`Трек для ${item.employee_name}`} value={legacyTargets[item.employee_id] ?? ""} onChange={(event) => setLegacyTargets((current) => ({ ...current, [item.employee_id]: event.target.value as "onboarding" | "development" }))}><option value="">Выберите трек</option><option value="onboarding">Адаптация</option><option value="development">Моё развитие</option></select><button className="button button-secondary button-small" type="button" disabled={busy || !legacyTargets[item.employee_id]} onClick={() => void classifyLegacy(item.employee_id)}>Уточнить</button></li>)}</ul> : <p className={styles.legacyEmpty}>Для этого курса нет назначений без трека.</p>}
+      </div>}
       {employees.error && <ErrorBox message={employees.error} retry={employees.reload} />}
     </section>}
   </div>;
