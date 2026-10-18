@@ -13,6 +13,16 @@ export interface Profile {
   data_source: "mock_zup" | "zup";
 }
 
+export interface DirectoryPerson {
+  id: number;
+  full_name: string;
+  position: string;
+  department: string;
+  manager_id: number | null;
+  can_open_profile: boolean;
+  is_demo: boolean;
+}
+
 export type RequestStatus = "submitted" | "manager_approved" | "approved" | "rejected" | "withdrawn" | "cancellation_requested" | "cancelled";
 export interface SharedCalendar {
   month: string;

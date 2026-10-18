@@ -85,6 +85,8 @@ def main():
             "from app.database import get_engine; from app.models import Employee; from app.seed import seed; "
             "db=Session(get_engine()); empty=db.scalar(select(Employee.id).limit(1)) is None; db.close(); "
             "seed() if empty else None"], env=env, check=True, timeout=120)
+        if env.get("ZUP_MODE", "mock") == "mock":
+            subprocess.run([sys.executable, "-m", "app.provision_jana_people"], env=env, check=True, timeout=120)
         # Both commands are idempotent: file hashes prevent duplicate imports, and
         # stable demo course codes/assignment keys preserve existing progress and XP.
         subprocess.run([sys.executable, "-m", "app.import_initial_knowledge", "--directory", "/app/corpus"],

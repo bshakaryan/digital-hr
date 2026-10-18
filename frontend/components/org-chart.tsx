@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
-import { initials, roleLabel, type Profile } from "@/lib/api";
+import { initials, type DirectoryPerson, type Profile } from "@/lib/api";
 import { Icon } from "./ui";
 import styles from "./jana-people.module.css";
 
@@ -10,7 +10,10 @@ function employeeCount(value: number) {
   return `${value} ${word}`;
 }
 
-function chartModel(people: Profile[], matches: Profile[]) {
+type ChartPerson = DirectoryPerson | Profile;
+const canOpenCalendar = (person: ChartPerson) => !('can_open_profile' in person) || person.can_open_profile;
+
+function chartModel(people: ChartPerson[], matches: ChartPerson[]) {
   const byId = new Map(people.map(person => [person.id, person]));
   const parents = new Map(people.map(person => [person.id,
     person.manager_id !== person.id && person.manager_id !== null && byId.has(person.manager_id) ? person.manager_id : null,
@@ -39,22 +42,22 @@ function chartModel(people: Profile[], matches: Profile[]) {
       id = parents.get(id) ?? null;
     }
   }
-  const children = new Map<number, Profile[]>();
-  const roots: Profile[] = [];
+  const children = new Map<number, ChartPerson[]>();
+  const roots: ChartPerson[] = [];
   for (const person of people) {
     if (!visible.has(person.id)) continue;
     const parent = parents.get(person.id) ?? null;
     if (parent === null) roots.push(person);
     else children.set(parent, [...(children.get(parent) || []), person]);
   }
-  const sort = (left: Profile, right: Profile) => Number(children.has(right.id)) - Number(children.has(left.id)) || left.full_name.localeCompare(right.full_name, "ru");
+  const sort = (left: ChartPerson, right: ChartPerson) => Number(children.has(right.id)) - Number(children.has(left.id)) || left.full_name.localeCompare(right.full_name, "ru");
   roots.sort(sort);
   children.forEach(reports => reports.sort(sort));
   return { roots, children, matching, ancestors, count: visible.size };
 }
 
 export function OrgChart({ people, matches, filtered, meId, view, onSelect, onCalendar }: {
-  people: Profile[]; matches: Profile[]; filtered: boolean; meId: number; view: "reporting" | "departments";
+  people: ChartPerson[]; matches: ChartPerson[]; filtered: boolean; meId: number; view: "reporting" | "departments";
   onSelect: (id: number) => void; onCalendar: (id: number) => void;
 }) {
   const model = useMemo(() => chartModel(people, matches), [people, matches]);
@@ -65,7 +68,7 @@ export function OrgChart({ people, matches, filtered, meId, view, onSelect, onCa
   const managers = [...model.children.keys()];
   const hasOpen = managers.some(isOpen);
 
-  function branch(person: Profile): React.ReactNode {
+  function branch(person: ChartPerson): React.ReactNode {
     const reports = model.children.get(person.id) || [];
     const hasReports = reports.length > 0;
     const open = hasReports && isOpen(person.id);
@@ -80,8 +83,8 @@ export function OrgChart({ people, matches, filtered, meId, view, onSelect, onCa
           {hasReports && <span className={`org-chart-toggle${open ? " is-open" : ""}`}><Icon name="chevron" size={16} /></span>}
         </button>
         <div className="org-chart-card-footer">
-          {hasReports ? <span className="org-chart-count"><Icon name="people" size={13} />{reports.length} {reports.length % 10 === 1 && reports.length % 100 !== 11 ? "подчинённый" : "подчинённых"}</span> : <span className="org-chart-role">{roleLabel[person.role]}</span>}
-          <div className="org-chart-person-actions"><button type="button" className="org-chart-profile" aria-label={`Открыть календарь: ${person.full_name}`} onClick={() => onCalendar(person.id)}><Icon name="calendar" size={13} />Календарь</button><button type="button" className="org-chart-profile" aria-label={`Открыть профиль: ${person.full_name}`} onClick={() => onSelect(person.id)}>Профиль<Icon name="arrow" size={13} /></button></div>
+          {hasReports ? <span className="org-chart-count"><Icon name="people" size={13} />{reports.length} {reports.length % 10 === 1 && reports.length % 100 !== 11 ? "подчинённый" : "подчинённых"}</span> : <span className="org-chart-role">{person.department}</span>}
+          <div className="org-chart-person-actions">{canOpenCalendar(person) && <button type="button" className="org-chart-profile" aria-label={`Открыть календарь: ${person.full_name}`} onClick={() => onCalendar(person.id)}><Icon name="calendar" size={13} />Календарь</button>}<button type="button" className="org-chart-profile" aria-label={`Открыть карточку: ${person.full_name}`} onClick={() => onSelect(person.id)}>Карточка<Icon name="arrow" size={13} /></button></div>
         </div>
       </article>
       {open && <ul id={childrenId} className="org-chart-children" aria-label={`Подчинённые: ${person.full_name}`}>{reports.map(branch)}</ul>}
@@ -105,13 +108,13 @@ export function OrgChart({ people, matches, filtered, meId, view, onSelect, onCa
 }
 
 function DepartmentStructure({ people, matches, onSelect, onCalendar }: {
-  people: Profile[]; matches: Profile[]; onSelect: (id: number) => void; onCalendar: (id: number) => void;
+  people: ChartPerson[]; matches: ChartPerson[]; onSelect: (id: number) => void; onCalendar: (id: number) => void;
 }) {
   const prefix = useId();
   const [expanded, setExpanded] = useState(new Set<string>());
   const byId = useMemo(() => new Map(people.map(person => [person.id, person])), [people]);
   const departments = useMemo(() => {
-    const groups = new Map<string, Profile[]>();
+    const groups = new Map<string, ChartPerson[]>();
     for (const person of matches) groups.set(person.department, [...(groups.get(person.department) || []), person]);
     return [...groups].sort(([left], [right]) => left.localeCompare(right, "ru"))
       .map(([name, members]) => ({ name, members: members.sort((left, right) => left.full_name.localeCompare(right.full_name, "ru")) }));
@@ -127,14 +130,14 @@ function DepartmentStructure({ people, matches, onSelect, onCalendar }: {
     <header className={styles.departmentHeader}><div><h2>Подразделения</h2><p>Группы сотрудников из доступных профилей. Линии подчинения показаны во вкладке «Подчинение».</p></div><div className={styles.departmentControls}><button type="button" disabled={departments.every(group => expanded.has(group.name))} onClick={() => setExpanded(new Set(departments.map(group => group.name)))}>Развернуть всё</button><button type="button" disabled={!expanded.size} onClick={() => setExpanded(new Set())}>Свернуть всё</button></div></header>
     <div className={styles.departmentGrid}>{departments.map((group, index) => {
       const managers = [...new Map(group.members.map(member => member.manager_id === null ? null : byId.get(member.manager_id))
-        .filter((manager): manager is Profile => Boolean(manager && manager.department === group.name))
+        .filter((manager): manager is ChartPerson => Boolean(manager && manager.department === group.name))
         .map(manager => [manager.id, manager])).values()];
       const open = expanded.has(group.name);
       const membersId = `${prefix}-department-${index}`;
       return <section className={styles.departmentCard} key={group.name}>
         <button type="button" className={styles.departmentToggle} aria-expanded={open} aria-controls={open ? membersId : undefined} onClick={() => toggle(group.name)}><span><strong>{group.name}</strong><small>{employeeCount(group.members.length)}</small></span><Icon name="chevron" size={18} /></button>
         {managers.length > 0 && <p className={styles.departmentManagers}>Руководители сотрудников: {managers.map(manager => manager.full_name).join(", ")}</p>}
-        {open && <ul id={membersId} className={styles.departmentMembers}>{group.members.map(person => <li key={person.id}><span className={styles.avatar} aria-hidden="true">{initials(person.full_name)}</span><div><button type="button" onClick={() => onSelect(person.id)}>{person.full_name}</button><small>{person.position} · {roleLabel[person.role]}</small></div><button type="button" className={styles.departmentCalendar} aria-label={`Открыть календарь: ${person.full_name}`} onClick={() => onCalendar(person.id)}><Icon name="calendar" size={16} /></button></li>)}</ul>}
+        {open && <ul id={membersId} className={styles.departmentMembers}>{group.members.map(person => <li key={person.id}><span className={styles.avatar} aria-hidden="true">{initials(person.full_name)}</span><div><button type="button" onClick={() => onSelect(person.id)}>{person.full_name}</button><small>{person.position}</small></div>{canOpenCalendar(person) && <button type="button" className={styles.departmentCalendar} aria-label={`Открыть календарь: ${person.full_name}`} onClick={() => onCalendar(person.id)}><Icon name="calendar" size={16} /></button>}</li>)}</ul>}
       </section>;
     })}</div>
   </section>;

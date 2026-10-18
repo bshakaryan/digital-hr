@@ -37,6 +37,16 @@ class Profile(BaseModel):
     data_source: Literal["mock_zup", "zup"] = "mock_zup"
 
 
+class DirectoryPerson(BaseModel):
+    id: int
+    full_name: str
+    position: str
+    department: str
+    manager_id: int | None
+    can_open_profile: bool
+    is_demo: bool
+
+
 class CalendarEmployee(BaseModel):
     id: int
     full_name: str

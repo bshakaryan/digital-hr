@@ -32,12 +32,20 @@ class HRISAdapter(Protocol):
 
 class DemoZupFixtures:
     def employees(self):
-        return [
+        from app.demo_people import SYNTHETIC_PEOPLE
+
+        core = [
             EmployeeSnapshot(1, "employee@example.com", "Айдана Демо", "employee", "Координатор логистики", "Операционный отдел", 2, date(2024, 3, 15), 18, "demo-1"),
             EmployeeSnapshot(2, "manager@example.com", "Арман Демо", "manager", "Руководитель отдела", "Операционный отдел", None, date(2022, 6, 1), 22, "demo-2"),
             EmployeeSnapshot(3, "hr@example.com", "Алия Демо", "hr_admin", "HR-партнёр", "HR", None, date(2023, 1, 10), 24, "demo-3"),
             EmployeeSnapshot(4, "outsider@example.com", "Данияр Демо", "employee", "Специалист поддержки", "Клиентский сервис", None, date(2025, 2, 1), 12, "demo-4"),
         ]
+        synthetic = [EmployeeSnapshot(
+            fixture_id, f"jana.people.{fixture_id - 1000:03}@example.com", name, role, position,
+            department, manager_id, date(2022 + index % 4, 1 + index % 12, 5 + index % 20),
+            20, f"people-{fixture_id - 1000:03}",
+        ) for index, (fixture_id, name, role, position, department, manager_id) in enumerate(SYNTHETIC_PEOPLE)]
+        return core + synthetic
 
 
 class ZupBalance(BaseModel):

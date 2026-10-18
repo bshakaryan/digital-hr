@@ -28,7 +28,7 @@ def seed():
         # provisioning with inserts while repairing their sequence high-water marks.
         db.execute(text("LOCK TABLE employees, courses, knowledge_documents IN SHARE ROW EXCLUSIVE MODE"))
         # Managers must exist before inserting direct reports (FK enabled).
-        snapshots = zup_adapter().employees()
+        snapshots = [person for person in zup_adapter().employees() if person.zup_id in {"demo-1", "demo-2", "demo-3", "demo-4"}]
         for snapshot in sorted(snapshots, key=lambda e: e.manager_id is not None):
             if db.get(Employee, snapshot.id) is None:
                 db.add(Employee(**asdict(snapshot), password_hash=password_hash.hash(password)))
@@ -49,7 +49,7 @@ def seed():
             db.flush()
         elif course.content in (old_course_content, previous_course_content, ledger_course_content, standard_course_content):
             course.content = course_content
-        for employee in db.scalars(select(Employee)).all():
+        for employee in db.scalars(select(Employee).where(Employee.zup_id.in_({"demo-1", "demo-2", "demo-3", "demo-4"}))).all():
             if db.scalar(select(CourseAssignment).where(CourseAssignment.employee_id == employee.id, CourseAssignment.course_id == 1)) is None:
                 db.add(CourseAssignment(employee_id=employee.id, course_id=1))
                 notify(db, employee.id, "course_assigned", "Вам назначен курс", "Начните с курса «Знакомство с JanaМен».", entity_type="course", entity_id=1, actor_id=3)
