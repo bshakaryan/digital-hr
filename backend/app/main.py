@@ -11,6 +11,7 @@ app = FastAPI(title="JanaМен Digital HR", version="0.3.0", description="Де�
 app.add_middleware(CORSMiddleware, allow_origins=get_settings().cors_origins.split(","), allow_credentials=False, allow_methods=["GET", "POST", "PATCH"], allow_headers=["Authorization", "Content-Type", "Idempotency-Key"])
 for module in (auth, employees, calendar, requests, lifecycle, academy, notifications, knowledge_files, assistant, audit, zup, documentolog):
     app.include_router(module.router, prefix="/api")
+app.include_router(employees.directory_router, prefix="/api")
 
 
 @app.get("/api/health", tags=["health"])

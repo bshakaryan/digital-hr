@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ApiClient, ApiError, date, dateTime, errorMessage, initials, roleLabel, type Course, type LeaveCalculation, type LeaveRequest, type Notification, type Profile, type RequestDraft, type SharedCalendar } from "@/lib/api";
+import { ApiClient, ApiError, date, dateTime, errorMessage, initials, roleLabel, type Course, type DirectoryPerson, type LeaveCalculation, type LeaveRequest, type Notification, type Profile, type RequestDraft, type SharedCalendar } from "@/lib/api";
 import { Brand, Empty, ErrorBox, Icon, Loading, Modal, Status, type IconName } from "./ui";
 import { useResource, type Resource } from "./use-resource";
 import { Requests, RequestDetail } from "./requests";
@@ -11,7 +11,8 @@ import { Audit } from "./audit";
 import { ZupIntegration } from "./zup-integration";
 import { DocumentologIntegration } from "./documentolog";
 import { LeaveCalendar } from "./leave-calendar";
-import { TeamCalendar, TeamDirectory } from "./team";
+import { TeamCalendar } from "./team";
+import { CompanyDirectory } from "./company-directory";
 import { Notifications } from "./notifications";
 import { IntegrationQueue } from "./integration-queue";
 import { EmployeeCalendar } from "./employee-calendar";
@@ -52,6 +53,7 @@ export function Workspace({ api, me: initialProfile, onLogout }: { api: ApiClien
   const courses = useResource<Course[]>(api, "/courses");
   const notifications = useResource<Notification[]>(api, "/notifications");
   const employees = useResource<Profile[]>(api, "/employees");
+  const directory = useResource<DirectoryPerson[]>(api, "/directory");
   const sharedCalendar = useResource<SharedCalendar>(api, `/calendar?month=${calendarMonth}`);
   const [calculation, setCalculation] = useState<LeaveCalculation | null>(null);
   const [calculationError, setCalculationError] = useState("");
@@ -75,7 +77,7 @@ export function Workspace({ api, me: initialProfile, onLogout }: { api: ApiClien
   }, [api, create, draft.start_date, draft.end_date, calculationRevision, replacement]);
   const unread = notifications.data?.filter((item) => !item.read).length;
   const pendingReviews = requests.data?.filter((item) => canReview(me, item, employees.data)).length;
-  const nav = [...navigation, ...(me.role !== "employee" ? [{ tab: "team" as const, title: "Команда", icon: "people" as const }] : []), ...(me.role === "hr_admin" ? [{ tab: "integrations" as const, title: "Интеграции и очереди", icon: "refresh" as const }, { tab: "audit" as const, title: "Журнал аудита", icon: "shield" as const }] : [])];
+  const nav = [...navigation, { tab: "team" as const, title: "Сотрудники", icon: "people" as const }, ...(me.role === "hr_admin" ? [{ tab: "integrations" as const, title: "Интеграции и очереди", icon: "refresh" as const }, { tab: "audit" as const, title: "Журнал аудита", icon: "shield" as const }] : [])];
   const title = nav.find((item) => item.tab === tab)?.title;
   function navigate(value: Tab) { setTab(value); setMenu(false); setDetailId(null); setEmployeeId(null); setCourseId(null); window.location.hash = value; window.scrollTo({ top: 0, behavior: "instant" }); }
   function openRequest(id: number) { const hash = window.location.hash.slice(1); requestReturn.current = /^(team\/\d+\/calendar|calendar\/mine)$/.test(hash) ? hash : null; setDetailId(id); setEmployeeId(null); window.location.hash = tab === "requests" ? `requests/${id}` : `${tab}/request/${id}`; }
@@ -96,7 +98,7 @@ export function Workspace({ api, me: initialProfile, onLogout }: { api: ApiClien
       const [value, target, nestedId] = window.location.hash.slice(1).split("/");
       if (value === "profile" && target === "calendar") { window.location.hash = "calendar/mine"; return; }
       const rawId = target === "request" ? nestedId : target;
-      const allowed = [...navigation.map(item => item.tab), ...(me.role !== "employee" ? ["team"] : []), ...(me.role === "hr_admin" ? ["audit", "integrations"] : [])];
+      const allowed = [...navigation.map(item => item.tab), "team", ...(me.role === "hr_admin" ? ["audit", "integrations"] : [])];
       const next = allowed.includes(value as Tab) ? value as Tab : "home";
       const id = rawId && /^\d+$/.test(rawId) ? Number(rawId) : null;
       setTab(next); setDetailId(target === "request" || next === "requests" ? id : null); setEmployeeId(next === "team" && target !== "request" ? id : null); setCourseId(next === "academy" && target !== "request" ? id : null); setMenu(false);
@@ -152,7 +154,7 @@ export function Workspace({ api, me: initialProfile, onLogout }: { api: ApiClien
       {tab === "academy" && <Academy api={api} courses={courses} role={me.role} initialCourseId={courseId} onChanged={() => { courses.reload(); notifications.reload(); }} notify={setToast} />}
       {tab === "assistant" && <Assistant api={api} />}
       {tab === "notifications" && <Notifications api={api} resource={notifications} onOpen={openNotification} />}
-      {tab === "team" && me.role !== "employee" && <TeamDirectory resource={employees} requests={requests} me={me} selectedId={employeeId} selectedView={employeeView} onSelect={selectEmployee} onRequest={openRequest} />}
+      {tab === "team" && <CompanyDirectory directory={directory} profiles={employees} requests={requests} me={me} selectedId={employeeId} selectedView={employeeView} onSelect={selectEmployee} onRequest={openRequest} />}
       {tab === "calendar" && <><PageHeading eyebrow="ПЛАНИРОВАНИЕ" title="Календарь сотрудников" description="Отпуска сотрудников и ваши дни отдыха." /><div className="calendar-view-bar"><div className="segmented calendar-mode-buttons" role="group" aria-label="Вид календаря"><button type="button" className={calendarMode === "mine" ? "selected" : ""} aria-pressed={calendarMode === "mine"} onClick={showMyCalendar}>Мой календарь</button><button type="button" className={calendarMode === "employees" ? "selected" : ""} aria-pressed={calendarMode === "employees"} onClick={() => { setCalendarMode("employees"); navigate("calendar"); }}>Общий</button></div><div className="calendar-balance"><Icon name="leaf" size={20} /><span>Остаток отпуска<strong>{me.leave_balance} дн.</strong></span></div></div>{calendarMode === "mine" ? <EmployeeCalendar key={me.id} employee={me} requests={requests} month={calendarMonth} onMonthChange={setCalendarMonth} onOpen={openRequest} /> : <TeamCalendar resource={sharedCalendar} month={calendarMonth} onMonthChange={setCalendarMonth} onOpen={openRequest} onEmployee={id => { if (id === me.id) showMyCalendar(); else { navigate("team"); selectEmployee(id, "calendar"); } }} />}</>}
       {tab === "integrations" && me.role === "hr_admin" && <><PageHeading eyebrow="АДМИНИСТРИРОВАНИЕ" title="Интеграции и очереди" description="Состояние связи, передачи отпусков и документов." /><ZupIntegration api={api} /><DocumentologIntegration api={api} /><IntegrationQueue requests={requests} onOpen={openRequest} /></>}
       {tab === "audit" && me.role === "hr_admin" && <Audit api={api} employees={employees.data || []} onRequest={openRequest} onEmployee={id => { navigate("team"); selectEmployee(id); }} />}
